@@ -41,10 +41,10 @@ sudo apt install -y python3-dev python3-pip python3-setuptools python3-wheel pyt
 
 ### 步骤 3：Java 运行时
 
-安装 OpenJDK 17 和 X11 依赖项：
+安装 OpenJDK 21 和 X11 依赖项：
 
 ```bash
-sudo apt install -y openjdk-17-jdk xserver-xorg xorg xvfb cmake libboost-dev
+sudo apt install -y openjdk-21-jdk xserver-xorg xorg xvfb cmake libboost-dev
 ```
 
 ### 步骤 4：图像处理
@@ -80,9 +80,9 @@ sudo apt install -y qgis qgis-plugin-grass
 下载并安装 WorldPainter：
 
 ```bash
-wget -O /tmp/worldpainter_2.21.0.deb https://www.worldpainter.net/files/worldpainter_2.21.0.deb
-sudo dpkg -i /tmp/worldpainter_2.21.0.deb
-rm /tmp/worldpainter_2.21.0.deb
+wget -O /tmp/worldpainter_2.26.1.deb https://www.worldpainter.net/files/worldpainter_2.26.1.deb
+sudo dpkg -i /tmp/worldpainter_2.26.1.deb
+rm /tmp/worldpainter_2.26.1.deb
 mkdir -p ~/.local/share/worldpainter/
 ```
 
@@ -96,7 +96,7 @@ sudo sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
 下载并安装 Minutor 地图查看器：
 
 ```bash
-wget -O /tmp/Minutor.Ubuntu-22.04.zip https://github.com/mrkite/minutor/releases/download/2.20.0/Minutor.Ubuntu-22.04.zip
+wget -O /tmp/Minutor.Ubuntu-22.04.zip https://github.com/mrkite/minutor/releases/download/2.21.0/Minutor.Ubuntu-22.04.zip
 unzip /tmp/Minutor.Ubuntu-22.04.zip
 chmod +x minutor
 sudo mv minutor /usr/bin/
