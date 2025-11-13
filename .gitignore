@@ -163,3 +163,4 @@ bin/
 config.json
 config.yaml
 Data/*
+generator.log
