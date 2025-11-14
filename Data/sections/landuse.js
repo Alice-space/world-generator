@@ -2,25 +2,19 @@
 if (true) {
 
 	//beach
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.applyToTerrain()
 		.withFilter(noWaterFilter)
 		.fromColour(255, 255, 127).toTerrain(5) //terrain=sand
 		.go();
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(noWaterFilter)
 		.applyToLayer(biomesLayer)
 		.fromColour(255, 255, 127).toLevel(BIOME_BEACH) //biome=beach
 		.go();
 
 	if (mod_BOP === "True") {
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(biomesLayer)
 			.fromColour(255, 255, 127).toLevel(BIOME_BOP_DUNE_BEACH) //biome=dune beach
@@ -28,18 +22,14 @@ if (true) {
 	}
 
 	//grass	
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(noWaterFilter)
 		.applyToLayer(grassLayer)
 		.fromColour(0, 200, 0).toLevel(1) //terrain=gras
 		.go();
 
 	//bare_stone
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.applyToTerrain()
 		.withFilter(noWaterFilter)
 		.fromColour(50, 50, 50).toTerrain(28) //terrain=stone
@@ -48,9 +38,7 @@ if (true) {
 	//farm
 	if (settingsFarms === "True") {
 
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.applyToTerrain()
 			.withFilter(noWaterFilter)
 			.fromColour(255, 215, 0).toTerrain(1) //terrain=gras
@@ -62,9 +50,7 @@ if (true) {
 			.fromColour(254, 216, 0).toTerrain(1) //terrain=gras
 			.fromColour(254, 216, 1).toTerrain(1) //terrain=gras
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(farmDirtLayer)
 			.fromColour(255, 215, 0).toLevel(1)
@@ -76,41 +62,31 @@ if (true) {
 			.fromColour(254, 216, 0).toLevel(1)
 			.fromColour(254, 216, 1).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(farmWheatLayer)
 			.fromColour(255, 215, 0).toLevel(1)
 			.fromColour(255, 215, 1).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(farmPotatoesLayer)
 			.fromColour(255, 216, 0).toLevel(1)
 			.fromColour(255, 216, 1).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(farmCarrotsLayer)
 			.fromColour(254, 215, 0).toLevel(1)
 			.fromColour(254, 215, 1).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(farmBeetrootLayer)
 			.fromColour(254, 216, 0).toLevel(1)
 			.fromColour(254, 216, 1).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(biomesLayer)
 			.fromColour(255, 215, 0).toLevel(BIOME_MEADOW)
@@ -124,62 +100,46 @@ if (true) {
 			.go();
 
 		//remove farm_dirt on highways and streets
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(farmDirtLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
 			.go();
 		//remove farm_crop on street
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(farmWheatLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
 			.go();
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(farmPotatoesLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
 			.go();
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(farmCarrotsLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
 			.go();
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(farmBeetrootLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
 			.go();
 
 		//berry_bushes
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(berryBushesLayer)
 			.fromColour(150, 0, 150).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(biomesLayer)
 			.fromColour(150, 0, 150).toLevel(BIOME_MEADOW)
 			.go();
 		//remove berry_bushes on street
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(berryBushesLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(200, 200, 200).toLevel(0)
@@ -188,38 +148,28 @@ if (true) {
 
 	//meadow
 	if (settingsMeadows === "True") {
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.applyToTerrain()
 			.withFilter(noWaterFilter)
 			.fromColour(0, 255, 0).toTerrain(1) //terrain=gras
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(biomesLayer)
 			.fromColour(0, 255, 0).toLevel(BIOME_MEADOW)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(grassLayer)
 			.fromColour(0, 255, 0).toLevel(1) //terrain=gras
 			.go();
 		//remove streets on meadow
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(bigRoadLayer)
 			.fromColour(0, 255, 0).toLevel(0)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(middleRoadLayer)
 			.fromColour(0, 255, 0).toLevel(0)
@@ -228,31 +178,23 @@ if (true) {
 
 	//quarry
 	if (settingsQuarrys === "True") {
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToTerrain()
 			.fromColour(100, 100, 100).toTerrain(28) //terrain=stone
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(quarryLayer)
 			.fromColour(100, 100, 100).toLevel(1)
 			.go();
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.withFilter(noWaterFilter)
 			.applyToLayer(biomesLayer)
 			.fromColour(100, 100, 100).toLevel(BIOME_WINDSWEPT_GRAVELLY_HILLS)
 			.go();
 		//remove quarry on street
-		wp.applyHeightMap(road)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(road)
 			.applyToLayer(quarryLayer)
 			.fromColour(0, 0, 0).toLevel(0)
 			.fromColour(100, 100, 100).toLevel(0)
@@ -261,9 +203,7 @@ if (true) {
 
 	if (settingsAerodrome === "True") {
 		var end_portal = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_aerodrome.png').go();
-		wp.applyHeightMap(end_portal)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(end_portal)
 			.applyToLayer(endPortalLayer)
 			.fromColour(0, 127, 127).toLevel(15)
 			.go();
@@ -288,9 +228,7 @@ if (true) {
 	//easter egg
 	if (scale > 1023 && tilesPerMap === 1) {
 		var easter_eggs = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_easter_eggs.png').go();
-		wp.applyHeightMap(easter_eggs)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(easter_eggs)
 			.withFilter(noWaterFilter)
 			.applyToLayer(eastereggCreatorLayer)
 			.fromColour(0, 0, 0).toLevel(15)

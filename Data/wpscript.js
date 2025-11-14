@@ -5,122 +5,124 @@
 //Other versions will most likely work, but it is not guaranteed
 //Created by DerMattinger
 
-//startup parameters
-if (true) {
+var GLOBAL_CONTEXT = Function("return this;")();
 
-	var path = arguments[0];
-	var directionLatitude = arguments[1];
-	var latitude = parseInt(arguments[2]);
-	var directionLongitute = arguments[3];
-	var longitute = parseInt(arguments[4]);
-	var scale = parseInt(arguments[5]);
-	var tilesPerMap = parseInt(arguments[6]);
-	var verticalScale = parseInt(arguments[7]);
-
-	var settingsBorders = arguments[8];
-	var settingsStateBorders = arguments[9];
-	var settingsHighways = arguments[10];
-	var settingsStreets = arguments[11];
-	var settingsSmallStreets = arguments[12];
-	var settingsBuildings = arguments[13];
-	var settingsOres = arguments[14];
-	var settingsNetherite = arguments[15];
-	var settingsFarms = arguments[16];
-	var settingsMeadows = arguments[17];
-	var settingsQuarrys = arguments[18];
-	var settingsAerodrome = arguments[19];
-	var settingsMobSpawner = arguments[20];
-	var settingsAnimalSpawner = arguments[21];
-	var settingsRivers = arguments[22];
-	var settingsStreams = arguments[23];
-	var settingsVolcanos = arguments[24];
-	var settingsShrubs = arguments[25];
-	var settingsCrops = arguments[26];
-	var settingsMapVersion = arguments[27];
-	var settingsMapOffset = arguments[28];
-	var settingsLowerBuildLimit = parseInt(arguments[29]);
-	var settingsUpperBuildLimit = parseInt(arguments[30]);
-	var settingsVanillaPopulation = arguments[31];
-	var heightmapName = arguments[32];
-	var biomeSource = arguments[33];
-	var oreModifier = arguments[34];
-	var mod_BOP = arguments[35];
-	var mod_BYG = arguments[36];
-	var mod_Terralith = arguments[37];
-	var mod_williamWythers = arguments[38];
-	var mod_Create = arguments[39];
+function parseIntArg(value) {
+	return parseInt(value, 10);
 }
+
+var STARTUP_ARGUMENTS = [
+	{ name: "path" },
+	{ name: "directionLatitude" },
+	{ name: "latitude", parser: parseIntArg },
+	{ name: "directionLongitute" },
+	{ name: "longitute", parser: parseIntArg },
+	{ name: "scale", parser: parseIntArg },
+	{ name: "tilesPerMap", parser: parseIntArg },
+	{ name: "verticalScale", parser: parseIntArg },
+
+	{ name: "settingsBorders" },
+	{ name: "settingsStateBorders" },
+	{ name: "settingsHighways" },
+	{ name: "settingsStreets" },
+	{ name: "settingsSmallStreets" },
+	{ name: "settingsBuildings" },
+	{ name: "settingsOres" },
+	{ name: "settingsNetherite" },
+	{ name: "settingsFarms" },
+	{ name: "settingsMeadows" },
+	{ name: "settingsQuarrys" },
+	{ name: "settingsAerodrome" },
+	{ name: "settingsMobSpawner" },
+	{ name: "settingsAnimalSpawner" },
+	{ name: "settingsRivers" },
+	{ name: "settingsStreams" },
+	{ name: "settingsVolcanos" },
+	{ name: "settingsShrubs" },
+	{ name: "settingsCrops" },
+	{ name: "settingsMapVersion" },
+	{ name: "settingsMapOffset" },
+	{ name: "settingsLowerBuildLimit", parser: parseIntArg },
+	{ name: "settingsUpperBuildLimit", parser: parseIntArg },
+	{ name: "settingsVanillaPopulation" },
+	{ name: "heightmapName" },
+	{ name: "biomeSource" },
+	{ name: "oreModifier" },
+	{ name: "mod_BOP" },
+	{ name: "mod_BYG" },
+	{ name: "mod_Terralith" },
+	{ name: "mod_williamWythers" },
+	{ name: "mod_Create" }
+];
+
+(function assignStartupArguments(args) {
+	for (var i = 0; i < STARTUP_ARGUMENTS.length; i += 1) {
+		var spec = STARTUP_ARGUMENTS[i];
+		var value = args[i];
+		if (typeof spec.parser === "function") {
+			value = spec.parser(value);
+		}
+		GLOBAL_CONTEXT[spec.name] = value;
+	}
+})(arguments);
 
 load("utils.js");
 
-//shift calculations
-load("sections/shift.js");
+var SECTION_SEQUENCE = [
+	// shift calculations
+	"shift",
+	// variables
+	"variables",
+	// layers
+	"layers",
+	// heightmap
+	"heightmap",
+	// terrain import (important! after the world was created)
+	"terrain_import",
+	// custom biomes (important! after the world was created)
+	"custom_biomes",
+	// filters
+	"filters",
+	// climate
+	"climate",
+	// terrain
+	"terrain",
+	// water
+	"water",
+	// vegetation
+	"vegetation",
+	// steep mountains (after vegetation)
+	"steep_mountains",
+	// volcano
+	"volcano",
+	// landuse
+	"landuse",
+	// borders
+	"borders",
+	// adjust water depht on rivers and lakes
+	"water_depth_adjustments",
+	// remove temporary layers for filtering mixed vegetation
+	"mixed_layer_cleanup",
+	// delete duplicate XdeepWater layers
+	"deepwater_cleanup",
+	// roads
+	"roads",
+	// vanilla ores 
+	"vanilla_ores",
+	// caves
+	"caves",
+	// additional ores
+	"additional_ores",
+	// 1.12 & 1.18+ populate layer
+	"populate_layers",
+	// export
+	"export"
+];
 
-//variables
-load("sections/variables.js");
+loadSections(SECTION_SEQUENCE);
 
-//layers
-load("sections/layers.js");
-
-//heightmap
-load("sections/heightmap.js");
-
-//terrain import (important! after the world was created)
-load("sections/terrain_import.js");
-
-//custom biomes (important! after the world was created)
-load("sections/custom_biomes.js");
-
-//filters
-load("sections/filters.js");
-
-//climate
-load("sections/climate.js");
-
-//terrain
-load("sections/terrain.js");
-
-//water
-load("sections/water.js");
-
-//vegetation
-load("sections/vegetation.js");
-
-//steep mountains (after vegetation)
-load("sections/steep_mountains.js");
-
-//volcano
-load("sections/volcano.js");
-
-//landuse
-load("sections/landuse.js");
-
-//borders
-load("sections/borders.js");
-
-//adjust water depht on rivers and lakes
-load("sections/water_depth_adjustments.js");
-
-//remove temporary layers for filtering mixed vegetation
-load("sections/mixed_layer_cleanup.js");
-
-//delete duplicate XdeepWater layers
-load("sections/deepwater_cleanup.js");
-
-//roads
-load("sections/roads.js");
-
-//vanilla ores 
-load("sections/vanilla_ores.js");
-
-//caves
-load("sections/caves.js");
-
-//additional ores
-load("sections/additional_ores.js");
-
-//1.12 & 1.18+ populate layer
-load("sections/populate_layers.js");
-
-//export
-load("sections/export.js");
+function loadSections(sectionNames) {
+	for (var i = 0; i < sectionNames.length; i += 1) {
+		load("sections/" + sectionNames[i] + ".js");
+	}
+}

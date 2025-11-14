@@ -4,9 +4,7 @@ if (true) {
 	var groundcoverImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_terrain_reduced_colors.png').go();
 
 	//load custom terrain
-	wp.applyHeightMap(groundcoverImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(groundcoverImage)
 		.applyToTerrain()
 
 		.fromColour(0, 0, 0).toTerrain(4) //podzol
@@ -70,17 +68,13 @@ if (true) {
 	groundcoverImage = null;
 
 	//deep_snow in very cold biomes		
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToTerrain()
 		.fromColour(102, 102, 102).toTerrain(40) //ET - deep_snow
 		.go();
 
 	//replace the snow again in warm biomes
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.withFilter(snowyFilter)
 		.applyToTerrain()
 		.fromColour(0, 0, 255).toTerrain(5) //sand
@@ -113,24 +107,18 @@ if (true) {
 		.fromColour(255, 255, 255).toTerrain(5) //sand
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToTerrain()
 		.fromColour(255, 255, 255).toTerrain(5) //sand
 		.go();
 
 	//oceans
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToTerrain()
 		.fromLevels(0, 254).toLevel(36) //beachTerrain
 		.go();
 
-	wp.applyHeightMap(latitudeImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(latitudeImage)
 		.applyToLayer(biomesLayer)
 		.withFilter(sandFilter)
 		//everything below 60° latitude (south) will be replaced with cold_beach
@@ -138,9 +126,7 @@ if (true) {
 		.fromLevels(210, 255).toLevel(BIOME_COLD_BEACH)
 		.go();
 
-	wp.applyHeightMap(latitudeImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(latitudeImage)
 		.withFilter(sandFilter)
 		.applyToTerrain()
 		//everything below 60° latitude (south) will be replaced with ice
@@ -148,9 +134,7 @@ if (true) {
 		.go();
 
 	//oceans
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToTerrain()
 		.fromLevels(0, 254).toTerrain(37) //waterTerrain
 		.go();

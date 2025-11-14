@@ -46,6 +46,17 @@ function loadNamedLayer(name) {
 	return wp.getLayer().withName(name).go();
 }
 
+/**
+ * Creates a preconfigured height map applicator that already targets the active world
+ * and has the global shift applied. Callers can continue the fluent chain with filters,
+ * applyToLayer/applyToTerrain calls, etc.
+ */
+function heightMap(image) {
+	return wp.applyHeightMap(image)
+		.toWorld(world)
+		.shift(shiftLongitute, shiftLatitude);
+}
+
 function cropsEnabled() {
 	return String(settingsCrops).toLowerCase() !== "false";
 }

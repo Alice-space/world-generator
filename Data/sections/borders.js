@@ -1,79 +1,57 @@
 //borders
 if (settingsBorders === "True") {
 
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.withFilter(noWaterFilter)
 		.applyToLayer(borderLayer)
 		.fromLevels(0, 254).toLevel(1)
 		.go();
 	//remove border on water / wetland
-	wp.applyHeightMap(waterImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(waterImage)
 		.applyToLayer(borderLayer)
 		.fromLevels(0, 230).toLevel(0)
 		.go();
-	wp.applyHeightMap(riverImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(riverImage)
 		.applyToLayer(borderLayer)
 		.withFilter(noWaterFilterForRivers)
 		.fromLevels(0, 230).toLevel(0)
 		.go();
-	wp.applyHeightMap(wetImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(wetImage)
 		.applyToLayer(borderLayer)
 		.fromColour(0, 127, 127).toLevel(0)
 		.fromColour(0, 127, 0).toLevel(0)
 		.go();
 
 	//remove border from oceans
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToLayer(borderLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();
 
 	//remove border from streets
-	wp.applyHeightMap(road)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(road)
 		.applyToLayer(borderLayer)
 		.fromColour(0, 0, 0).toLevel(0)
 		.fromColour(200, 200, 200).toLevel(0)
 		.go();
 	//remove other layers from border
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.applyToLayer(farmDirtLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.applyToLayer(farmWheatLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.applyToLayer(farmPotatoesLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.applyToLayer(farmCarrotsLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();
-	wp.applyHeightMap(borderImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(borderImage)
 		.applyToLayer(farmBeetrootLayer)
 		.fromLevels(0, 254).toLevel(0)
 		.go();

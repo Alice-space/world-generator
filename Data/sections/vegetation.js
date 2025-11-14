@@ -22,9 +22,7 @@ if (settingsVanillaPopulation === "False") {
 		.go();
 
 	if (settingsBuildings === "True") {
-		wp.applyHeightMap(landuse)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(landuse)
 			.applyToTerrain()
 			.fromColour(255, 0, 0).toTerrain(48) //cobblestone
 			.go();
@@ -32,9 +30,7 @@ if (settingsVanillaPopulation === "False") {
 
 
 	var spruceImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_pine.png').go();
-	wp.applyHeightMap(spruceImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(spruceImage)
 		.applyToLayer(spruceLayer)
 		.fromLevels(0, 15).toLevel(0)
 		.fromLevels(16, 31).toLevel(1)
@@ -54,17 +50,13 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.applyToLayer(spruceLayer)
 		.fromColour(127, 31, 0).toLevel(15)
 		.go();
 
 	var deciduousImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_deciduous.png').go();
-	wp.applyHeightMap(deciduousImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(deciduousImage)
 		.applyToLayer(deciduousLayer)
 		.fromLevels(0, 15).toLevel(0)
 		.fromLevels(16, 31).toLevel(1)
@@ -84,17 +76,13 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.applyToLayer(deciduousLayer)
 		.fromColour(127, 63, 0).toLevel(15)
 		.go();
 
 	var jungleImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_jungle.png').go();
-	wp.applyHeightMap(jungleImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(jungleImage)
 		.applyToLayer(smallTreeEvergreenLayer)
 		.fromLevels(0, 15).toLevel(0)
 		.fromLevels(16, 31).toLevel(1)
@@ -120,9 +108,7 @@ if (settingsVanillaPopulation === "False") {
 		.toLevel(0)
 		.go();
 
-	wp.applyHeightMap(jungleImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(jungleImage)
 		.withFilter(jungleFilter)
 		.applyToLayer(evergreenLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -145,9 +131,7 @@ if (settingsVanillaPopulation === "False") {
 
 	var mixedImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_mixed.png').go();
 
-	wp.applyHeightMap(mixedImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(mixedImage)
 		.withFilter(savannahFilter)
 		.applyToLayer(acaciaLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -168,17 +152,13 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(savannahFilter)
 		.applyToLayer(acaciaLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(mixedImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(mixedImage)
 		.withFilter(desertFilter)
 		.applyToLayer(acaciaLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -199,17 +179,13 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(desertFilter)
 		.applyToLayer(acaciaLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(mixedImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(mixedImage)
 		.withFilter(plainsFilter)
 		.applyToLayer(mixedLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -230,17 +206,13 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(plainsFilter)
 		.applyToLayer(mixedLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(mixedImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(mixedImage)
 		.withFilter(tundraFilter)
 		.applyToLayer(mixedLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -261,18 +233,14 @@ if (settingsVanillaPopulation === "False") {
 		.fromLevels(240, 255).toLevel(15)
 		.go();
 
-	wp.applyHeightMap(landuse)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(landuse)
 		.withFilter(tundraFilter)
 		.applyToLayer(mixedLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
 	//remove arcacia on cold biomes
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(acaciaLayer)
 		.fromColour(200, 255, 80).toLevel(0) //Cfa - plains C8FF50
 		.fromColour(100, 255, 80).toLevel(0) //Cfb - plains 64FF50
@@ -295,9 +263,7 @@ if (settingsVanillaPopulation === "False") {
 		.go();
 
 	//remove mixed on warm biomes
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(mixedLayer)
 		.fromColour(0, 0, 255).toLevel(0) //Af - jungle_edge 0000FF 
 		.fromColour(0, 120, 255).toLevel(0) //Am - jungle_edge 0078FF
@@ -317,9 +283,7 @@ if (settingsVanillaPopulation === "False") {
 	if (settingsShrubs === "True") {
 
 		var shrubsImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_shrubs.png').go();
-		wp.applyHeightMap(shrubsImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(shrubsImage)
 			.withFilter(plainsFilter)
 			.applyToLayer(shrubsLayer)
 			.fromLevels(0, 15).toLevel(0)
@@ -340,9 +304,7 @@ if (settingsVanillaPopulation === "False") {
 			.fromLevels(240, 255).toLevel(15)
 			.go();
 
-		wp.applyHeightMap(shrubsImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(shrubsImage)
 			.withFilter(tundraFilter)
 			.applyToLayer(shrubsLayer)
 			.fromLevels(0, 15).toLevel(0)
@@ -363,9 +325,7 @@ if (settingsVanillaPopulation === "False") {
 			.fromLevels(240, 255).toLevel(15)
 			.go();
 
-		wp.applyHeightMap(shrubsImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(shrubsImage)
 			.withFilter(desertFilter)
 			.applyToLayer(shrubsLayerWithCactuses)
 			.fromLevels(0, 15).toLevel(0)
@@ -386,9 +346,7 @@ if (settingsVanillaPopulation === "False") {
 			.fromLevels(240, 255).toLevel(15)
 			.go();
 
-		wp.applyHeightMap(shrubsImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(shrubsImage)
 			.withFilter(savannahFilter)
 			.applyToLayer(shrubsLayerWithCactuses)
 			.fromLevels(0, 15).toLevel(0)
@@ -413,9 +371,7 @@ if (settingsVanillaPopulation === "False") {
 
 
 	var herbsImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_herbs.png').go();
-	wp.applyHeightMap(herbsImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(herbsImage)
 		.applyToLayer(herbsLayer)
 		.fromLevels(0, 15).toLevel(0)
 		.fromLevels(16, 31).toLevel(1)
@@ -438,9 +394,7 @@ if (settingsVanillaPopulation === "False") {
 	if (isVersionAtLeast("1-16")) {
 
 		var witherRoseImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_wither_rose.png').go();
-		wp.applyHeightMap(witherRoseImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(witherRoseImage)
 			.applyToLayer(halfetiRose)
 			.fromLevels(0, 253).toLevel(1)
 			.fromLevels(254, 255).toLevel(0)

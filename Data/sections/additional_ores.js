@@ -3,9 +3,7 @@ if (settingsOres === "True") {
 
 	var clayImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_clay.png').go();
 
-	wp.applyHeightMap(clayImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(clayImage)
 		.applyToLayer(clayDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -27,9 +25,7 @@ if (settingsOres === "True") {
 
 	var coalImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_coal.png').go();
 
-	wp.applyHeightMap(coalImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(coalImage)
 		.applyToLayer(coalDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -51,9 +47,7 @@ if (settingsOres === "True") {
 
 	var diamondImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_diamond.png').go();
 
-	wp.applyHeightMap(diamondImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(diamondImage)
 		.applyToLayer(diamondDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -74,9 +68,7 @@ if (settingsOres === "True") {
 		.go();
 
 	if (isVersionAtLeast("1-18")) {
-		wp.applyHeightMap(diamondImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(diamondImage)
 			.applyToLayer(deepslateDiamondDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -99,9 +91,7 @@ if (settingsOres === "True") {
 
 	var goldImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_gold.png').go();
 
-	wp.applyHeightMap(goldImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(goldImage)
 		.applyToLayer(goldDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -122,9 +112,7 @@ if (settingsOres === "True") {
 		.go();
 
 	if (isVersionAtLeast("1-18")) {
-		wp.applyHeightMap(goldImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(goldImage)
 			.applyToLayer(deepslateGoldDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -147,9 +135,7 @@ if (settingsOres === "True") {
 
 	var ironImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_iron.png').go();
 
-	wp.applyHeightMap(ironImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(ironImage)
 		.applyToLayer(ironDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -170,9 +156,7 @@ if (settingsOres === "True") {
 		.go();
 
 	if (isVersionAtLeast("1-18")) {
-		wp.applyHeightMap(ironImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(ironImage)
 			.applyToLayer(deepslateIronDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -196,9 +180,7 @@ if (settingsOres === "True") {
 	if ((isVersionAtLeast("1-16")) && settingsNetherite === "True") {
 		var netheriteImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_netherite.png').go();
 
-		wp.applyHeightMap(netheriteImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(netheriteImage)
 			.applyToLayer(netheriteDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -221,9 +203,7 @@ if (settingsOres === "True") {
 
 	var quartzImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_quartz.png').go();
 
-	wp.applyHeightMap(quartzImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(quartzImage)
 		.applyToLayer(quartzDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -245,9 +225,7 @@ if (settingsOres === "True") {
 
 	var redstoneImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_redstone.png').go();
 
-	wp.applyHeightMap(redstoneImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(redstoneImage)
 		.applyToLayer(redstoneDepositLayer)
 		.fromLevels(0, 15).toLevel(8)
 		.fromLevels(16, 31).toLevel(7)
@@ -268,9 +246,7 @@ if (settingsOres === "True") {
 		.go();
 
 	if (isVersionAtLeast("1-18")) {
-		wp.applyHeightMap(redstoneImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(redstoneImage)
 			.applyToLayer(deepslateRedstoneDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -295,9 +271,7 @@ if (settingsOres === "True") {
 
 		var copperImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_copper.png').go();
 
-		wp.applyHeightMap(copperImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(copperImage)
 			.applyToLayer(copperDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -318,9 +292,7 @@ if (settingsOres === "True") {
 			.go();
 
 		if (isVersionAtLeast("1-18")) {
-			wp.applyHeightMap(copperImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			heightMap(copperImage)
 				.applyToLayer(deepslateCopperDepositLayer)
 				.fromLevels(0, 15).toLevel(8)
 				.fromLevels(16, 31).toLevel(7)
@@ -349,9 +321,7 @@ if (settingsOres === "True") {
 		var mod_Create_zincDepositLayer = loadLayerFromFile('wpscript/ores/mods/create_zinc_deposit.layer');
 		var mod_Create_deepslateZincDepositLayer = loadLayerFromFile('wpscript/ores/mods/create_zinc_deposit_deepslate.layer');
 
-		wp.applyHeightMap(mod_Create_zincImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(mod_Create_zincImage)
 			.applyToLayer(mod_Create_zincDepositLayer)
 			.fromLevels(0, 15).toLevel(8)
 			.fromLevels(16, 31).toLevel(7)
@@ -373,9 +343,7 @@ if (settingsOres === "True") {
 
 		if (isVersionAtLeast("1-18")) {
 
-			wp.applyHeightMap(mod_Create_zincImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			heightMap(mod_Create_zincImage)
 				.applyToLayer(mod_Create_deepslateZincDepositLayer)
 				.fromLevels(0, 15).toLevel(8)
 				.fromLevels(16, 31).toLevel(7)
@@ -404,9 +372,7 @@ if (settingsOres === "True") {
 if (true) {
 
 	//last, replace the under water terrain
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToTerrain()
 		.withFilter(waterFilter)
 		.fromLevels(0, 254).toTerrain(36) //worldpainter beaches (sand gravel clay)

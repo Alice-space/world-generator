@@ -1,9 +1,7 @@
 //remove temporary layers for filtering mixed vegetation
 if (true) {
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(plainsLayer)
 		.fromColour(255, 255, 0).toLevel(0) //Csa - plains FFFF00
 		.fromColour(200, 200, 0).toLevel(0) //Csb - plains C8C800
@@ -17,18 +15,14 @@ if (true) {
 		.fromColour(55, 200, 255).toLevel(0) //Dfb - plains 37C8FF
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(desertLayer)
 		.fromColour(255, 0, 0).toLevel(0) //BWh - desert FF0000
 		.fromColour(255, 150, 150).toLevel(0) //BWk - desert FF9696
 		.fromColour(255, 220, 100).toLevel(0) //BSk - desert FFDC64
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(acaciaLayer)
 		.fromColour(0, 0, 255).toLevel(0) //Af - jungle 0000FF 
 		.fromColour(0, 120, 255).toLevel(0) //Am - jungle_edge 0078FF
@@ -36,9 +30,7 @@ if (true) {
 		.fromColour(245, 165, 0).toLevel(0) //BSh - savannah F5A500
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(tundraLayer)
 		.fromColour(255, 0, 255).toLevel(0) //Dsa - taiga FF00FF
 		.fromColour(200, 0, 200).toLevel(0) //Dsb - taiga C800C8
@@ -54,9 +46,7 @@ if (true) {
 		.fromColour(102, 102, 102).toLevel(0) //EF - snowy_tundra 666666
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(jungleLayer)
 		.fromColour(0, 0, 255).toLevel(0) //Af - jungle 0000FF 
 		.fromColour(0, 120, 255).toLevel(0) //Am - jungle_edge 0078FF

@@ -5,9 +5,9 @@ if (true) {
 	var platformTemplate = loadWorldTemplate(resolvePlatformWorld(verticalScale, tilesPerMap));
 	var platformMapFormat = platformTemplate.getPlatform();
 
-	var heightMap = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/heightmap/' + heightmapName + '.png').go();
+	var heightMapImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/heightmap/' + heightmapName + '.png').go();
 	var world = createWorldForScale(verticalScale, {
-		heightMap: heightMap,
+		heightMap: heightMapImage,
 		shiftLongitute: shiftLongitute,
 		shiftLatitude: shiftLatitude,
 		mapFormat: platformMapFormat
@@ -64,7 +64,6 @@ if (true) {
 		resizeWorld(world, transform, settingsLowerBuildLimit, settingsUpperBuildLimit, true, null)
 	}
 
-	heightMap = null;
+	heightMapImage = null;
 	print("heightmap created");
 }
-

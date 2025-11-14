@@ -7,9 +7,7 @@ if (true) {
 	if (biomeSource == "koeppen") {
 
 		//base biomes
-		wp.applyHeightMap(climateImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(climateImage)
 			.applyToLayer(biomesLayer)
 			.fromColour(0, 0, 255).toLevel(BIOME_JUNGLE) //Af 0000FF 
 			.fromColour(0, 120, 255).toLevel(BIOME_SPARSE_JUNGLE) //Am 0078FF
@@ -45,18 +43,14 @@ if (true) {
 
 	} else if (biomeSource == "ecoregions") {
 
-		wp.applyHeightMap(ecoRegionImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(ecoRegionImage)
 			.applyToLayer(biomesLayer)
 			.fromColour(255, 255, 255).toLevel(BIOME_BEACH) //Beach, gets later replaced by ocean 000000
 			.go();
 
 		//Insert custom biomes / modded biomes beginning here:
 
-		var eco_vanilla = wp.applyHeightMap(ecoRegionImage)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		var eco_vanilla = heightMap(ecoRegionImage)
 			.applyToLayer(biomesLayer);
 
 		eco_vanilla = eco_vanilla.fromColour(143, 206, 84).toLevel(BIOME_JUNGLE) //Admiralty Islands lowland rain forests
@@ -900,9 +894,7 @@ if (true) {
 			.go();
 
 		if (mod_BOP === "True") {
-			var eco_bop = wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			var eco_bop = heightMap(ecoRegionImage)
 				.applyToLayer(biomesLayer);
 
 			eco_bop = eco_bop.fromColour(143, 206, 84).toLevel(BIOME_BOP_RAINFOREST) //Admiralty Islands lowland rain forests
@@ -1077,9 +1069,7 @@ if (true) {
 		}
 
 		if (mod_BYG === "True") {
-			var eco_byg = wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			var eco_byg = heightMap(ecoRegionImage)
 				.applyToLayer(biomesLayer);
 
 			eco_byg = eco_byg.fromColour(143, 206, 84).toLevel(BIOME_BYG_TROPICAL_RAINFOREST) //Admiralty Islands lowland rain forests
@@ -1233,9 +1223,7 @@ if (true) {
 		}
 
 		if (mod_Terralith === "True") {
-			var eco_terralith = wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			var eco_terralith = heightMap(ecoRegionImage)
 				.applyToLayer(biomesLayer);
 
 			eco_terralith = eco_terralith.fromColour(143, 206, 84).toLevel(BIOME_TERRALITH_TROPICAL_JUNGLE) //Admiralty Islands lowland rain forests
@@ -2035,9 +2023,7 @@ if (true) {
 
 
 		if (mod_Terralith === "True") {
-			var eco_terralith = wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			var eco_terralith = heightMap(ecoRegionImage)
 				.applyToLayer(biomesLayer);
 
 			eco_terralith = eco_terralith.fromColour(227, 85, 108).toLevel(BIOME_TERRALITH_ALPINE_GROVE) //Alps conifer and mixed forests
@@ -2060,9 +2046,7 @@ if (true) {
 
 		if (settingsVanillaPopulation === "False") {
 
-			wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			heightMap(ecoRegionImage)
 				.applyToLayer(frostLayer)
 				.fromColour(53, 231, 121).toLevel(1) //Alaska-St. Elias Range tundra
 				.fromColour(76, 205, 166).toLevel(1) //Aleutian Islands tundra
@@ -2103,9 +2087,7 @@ if (true) {
 				.fromColour(121, 216, 161).toLevel(1) //Torngat Mountain tundra
 				.go();
 
-			wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			heightMap(ecoRegionImage)
 				.applyToLayer(swampTerrain)
 				.fromColour(108, 222, 214).toLevel(1) //Borneo peat swamp forests
 				.fromColour(224, 60, 98).toLevel(1) //Chao Phraya freshwater swamp forests
@@ -2138,9 +2120,7 @@ if (true) {
 				.fromColour(17, 234, 187).toLevel(1) //Zambezian halophytics
 				.go();
 
-			wp.applyHeightMap(ecoRegionImage)
-				.toWorld(world)
-				.shift(shiftLongitute, shiftLatitude)
+			heightMap(ecoRegionImage)
 				.applyToLayer(swampLayer)
 				.fromColour(108, 222, 214).toLevel(15) //Borneo peat swamp forests
 				.fromColour(224, 60, 98).toLevel(15) //Chao Phraya freshwater swamp forests
@@ -2176,9 +2156,7 @@ if (true) {
 
 			if (isVersionAtLeast("1-17")) {
 
-				wp.applyHeightMap(ecoRegionImage)
-					.toWorld(world)
-					.shift(shiftLongitute, shiftLatitude)
+				heightMap(ecoRegionImage)
 					.applyToLayer(dripleafsLayer)
 					.fromColour(108, 222, 214).toLevel(15) //Borneo peat swamp forests
 					.fromColour(224, 60, 98).toLevel(15) //Chao Phraya freshwater swamp forests
@@ -2215,9 +2193,7 @@ if (true) {
 
 			if (isVersionAtLeast("1-19")) {
 
-				wp.applyHeightMap(ecoRegionImage)
-					.toWorld(world)
-					.shift(shiftLongitute, shiftLatitude)
+				heightMap(ecoRegionImage)
 					.applyToLayer(mangroveTerrain)
 					.fromColour(67, 224, 200).toLevel(1) //Amazon-Orinoco-Southern Caribbean mangroves
 					.fromColour(202, 66, 21).toLevel(1) //Bahamian-Antillean mangroves
@@ -2243,9 +2219,7 @@ if (true) {
 					.fromColour(228, 114, 86).toLevel(1) //Sundarbans mangroves
 					.go();
 
-				wp.applyHeightMap(ecoRegionImage)
-					.toWorld(world)
-					.shift(shiftLongitute, shiftLatitude)
+				heightMap(ecoRegionImage)
 					.applyToLayer(mangroveLayer)
 					.fromColour(67, 224, 200).toLevel(15) //Amazon-Orinoco-Southern Caribbean mangroves
 					.fromColour(202, 66, 21).toLevel(15) //Bahamian-Antillean mangroves
@@ -2275,9 +2249,7 @@ if (true) {
 
 			if (settingsMapVersion === "1-20") {
 
-				wp.applyHeightMap(ecoRegionImage)
-					.toWorld(world)
-					.shift(shiftLongitute, shiftLatitude)
+				heightMap(ecoRegionImage)
 					.applyToLayer(cherryBlossumTreesLayer)
 					.fromColour(61, 167, 238).toLevel(15)
 					.fromColour(206, 145, 65).toLevel(15)
@@ -2291,9 +2263,7 @@ if (true) {
 	}
 
 	//temporary layers for filtering mixed vegetation
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(plainsLayer)
 		.fromColour(255, 255, 0).toLevel(1) //Csa - plains FFFF00
 		.fromColour(200, 200, 0).toLevel(1) //Csb - plains C8C800
@@ -2307,27 +2277,21 @@ if (true) {
 		.fromColour(55, 200, 255).toLevel(1) //Dfb - plains 37C8FF
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(desertLayer)
 		.fromColour(255, 0, 0).toLevel(1) //BWh - desert FF0000
 		.fromColour(255, 150, 150).toLevel(1) //BWk - desert FF9696
 		.fromColour(255, 220, 100).toLevel(1) //BSk - desert FFDC64
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(acaciaLayer)
 		.fromColour(0, 120, 255).toLevel(1) //Am - jungle_edge 0078FF
 		.fromColour(70, 170, 250).toLevel(1) //Aw - savannah 46AAFA
 		.fromColour(245, 165, 0).toLevel(1) //BSh - savannah F5A500
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(tundraLayer)
 		.fromColour(255, 0, 255).toLevel(1) //Dsa - taiga FF00FF
 		.fromColour(200, 0, 200).toLevel(1) //Dsb - taiga C800C8
@@ -2343,9 +2307,7 @@ if (true) {
 		.fromColour(102, 102, 102).toLevel(1) //EF - snowy_tundra 666666
 		.go();
 
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.applyToLayer(jungleLayer)
 		.fromColour(0, 0, 255).toLevel(1) //Af - jungle 0000FF 
 		.fromColour(0, 120, 255).toLevel(1) //Am - jungle_edge 0078FF
@@ -2353,24 +2315,18 @@ if (true) {
 
 	//base oceans
 
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToLayer(biomesLayer)
 		.fromLevels(234, 254).toLevel(BIOME_OCEAN) //oceanBiome
 		.fromLevels(0, 234).toLevel(BIOME_DEEP_OCEAN) //deepOceanBiome
 		.go();
 
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToLayer(oceanLayer)
 		.fromLevels(234, 254).toLevel(15) //oceanLayer
 		.go();
 
-	wp.applyHeightMap(bathymetryImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(bathymetryImage)
 		.applyToLayer(deepOceanLayer)
 		.fromLevels(0, 234).toLevel(15) //deepOceanLayer
 		.go();

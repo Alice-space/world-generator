@@ -3,17 +3,13 @@ if (true) {
 
 	if (new java.io.File(path + 'image_exports/' + tile + '/heightmap/' + tile + '_slope.png').isFile()) {
 		var slope = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/heightmap/' + tile + '_slope.png').go();
-		wp.applyHeightMap(slope)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(slope)
 			.applyToTerrain()
 			.fromLevels(20500, 65535).toTerrain(9) //mesa
 			.go();
 	} else {
 		var slope = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_slope.png').go();
-		wp.applyHeightMap(slope)
-			.toWorld(world)
-			.shift(shiftLongitute, shiftLatitude)
+		heightMap(slope)
 			.applyToTerrain()
 			.fromLevels(80, 255).toTerrain(9) //mesa
 			.go();
@@ -30,9 +26,7 @@ if (true) {
 	wp.applyLayer(smallTreeEvergreenLayer).toWorld(world).withFilter(mesaFilter).toLevel(0).go();
 
 	//define different steep terrain for different biomes
-	wp.applyHeightMap(climateImage)
-		.toWorld(world)
-		.shift(shiftLongitute, shiftLatitude)
+	heightMap(climateImage)
 		.withFilter(mesaFilter)
 		.applyToTerrain()
 		.fromColour(0, 0, 255).toLevel(49) //Af - jungle_edge 0000FF 
