@@ -1,0 +1,3 @@
+osmium==4.2.0
+pebble==5.1.3
+PyYAML==6.0.3
