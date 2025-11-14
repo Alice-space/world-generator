@@ -1,3 +1,8 @@
+###############################
+# Git LFS – large file storage #
+# Track large binary / dataset files with LFS
+
+# Example for your dataset file types
 *.tif filter=lfs diff=lfs merge=lfs -text
 *.shp filter=lfs diff=lfs merge=lfs -text
 *.dbf filter=lfs diff=lfs merge=lfs -text
@@ -13,3 +18,4 @@
 *.terrain filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.lyr filter=lfs diff=lfs merge=lfs -text
+# End of .gitattributes       #
