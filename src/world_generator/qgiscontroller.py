@@ -17,11 +17,13 @@ _QGIS_PLUGIN_PATH = "/usr/share/qgis/python/plugins"
 
 
 def _inject_qgis_plugins() -> None:
+    """Add the QGIS plugin directory to ``sys.path`` if it is missing."""
     if _QGIS_PLUGIN_PATH not in sys.path:
         sys.path.append(_QGIS_PLUGIN_PATH)
 
 
 def _create_qgs_application() -> Any:  # pragma: no cover - depends on QGIS runtime
+    """Create and initialize a headless ``QgsApplication`` instance."""
     from qgis.core import QgsApplication  # type: ignore
 
     QgsApplication.setPrefixPath("/usr", True)
@@ -35,6 +37,7 @@ def _create_qgs_application() -> Any:  # pragma: no cover - depends on QGIS runt
 def fix_geometry(
     project_path: str, algorithm: str, parameters: Mapping[str, Any]
 ) -> Mapping[str, Any]:
+    """Run a QGIS processing algorithm (usually "Fix geometries") and return the outputs."""
     _inject_qgis_plugins()
     from processing.core.Processing import Processing  # type: ignore
     from qgis import processing  # type: ignore
@@ -75,6 +78,7 @@ def export_image(
     layer_output_name: str,
     layers: Iterable[str],
 ) -> None:
+    """Export the requested layers from a QGIS project into tiled PNG images."""
     _inject_qgis_plugins()
     from PyQt5.QtCore import QSize  # type: ignore
     from qgis.core import (  # type: ignore
@@ -100,12 +104,14 @@ def export_image(
         logger.info("QGIS loaded project %s", project.fileName())
 
         def uncheck_all_layers() -> None:
+            """Hide every layer so we can re-enable only the requested ones."""
             root = project.layerTreeRoot()
             for layer in project.mapLayers().values():
                 node = root.findLayer(layer.id())
                 node.setItemVisibilityChecked(False)
 
         def select_layers() -> None:
+            """Turn on layers whose names start with any of the requested prefixes."""
             root = project.layerTreeRoot()
             for layer in project.mapLayers().values():
                 for layer_name in layers:
@@ -116,6 +122,7 @@ def export_image(
         def export_single_tile(
             output_name: Path, x_min: float, x_max: float, y_min: float, y_max: float
         ) -> None:
+            """Render one map tile covering the provided extent and write it to disk."""
             layout = QgsPrintLayout(project)
             layout.initializeDefaults()
 
