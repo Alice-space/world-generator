@@ -5,6 +5,7 @@ A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motf
 **中文安装指南** | [Chinese Installation Guide](README.zh.md)
 
 ## Table of Contents
+
 - [Direct Installation Guide](#direct-installation-guide)
 - [Docker Installation (Recommended)](#docker-installation-recommended)
 - [Usage](#usage)
@@ -16,6 +17,7 @@ A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motf
 This guide provides step-by-step instructions to install all dependencies directly on your system without using Docker.
 
 ### Prerequisites
+
 - Debian/Ubuntu-based Linux distribution (tested on Debian Bookworm)
 - Root or sudo access
 - Stable internet connection
@@ -87,6 +89,7 @@ mkdir -p ~/.local/share/worldpainter/
 ```
 
 Configure WorldPainter memory settings:
+
 ```bash
 sudo sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
 ```
@@ -130,6 +133,7 @@ mkdir -p workspace
 ```
 
 Copy configuration files:
+
 ```bash
 cp config.example.yaml config.yaml
 # Edit config.yaml according to your needs
@@ -149,6 +153,7 @@ mkdir -p ~/.local/share/worldpainter/config
 For a containerized setup, use Docker:
 
 ### Prerequisites
+
 - Docker installed on your system
 
 ### Quick Start
@@ -172,6 +177,7 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 ### Running the Generator
 
 For direct installation:
+
 ```bash
 # Set system limits
 ulimit -s unlimited
@@ -182,6 +188,7 @@ xvfb-run python3 main.py > generator.log
 ```
 
 For Docker installation:
+
 ```bash
 # Container runs automatically, check logs
 tail -f generator.log
@@ -190,6 +197,7 @@ tail -f generator.log
 ### Monitoring Progress
 
 Check the `generator.log` file for progress updates:
+
 ```bash
 tail -f generator.log
 ```
@@ -229,6 +237,7 @@ tail -f generator.log
 ## Configuration
 
 Edit `config.yaml` to customize:
+
 - `scripts_folder_path`: Path to WorldPainter scripts
 - `osm_folder_path`: Path to OSM data files
 - Processing parameters and output settings

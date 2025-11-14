@@ -5,6 +5,7 @@
 **English Installation Guide** | [英文安装指南](README.md)
 
 ## 目录
+
 - [直接安装指南](#直接安装指南)
 - [Docker 安装（推荐）](#docker-安装推荐)
 - [使用方法](#使用方法)
@@ -16,6 +17,7 @@
 本指南提供在不使用 Docker 的情况下，直接在系统上安装所有依赖项的分步说明。
 
 ### 系统要求
+
 - 基于 Debian/Ubuntu 的 Linux 发行版（在 Debian Bookworm 上测试）
 - Root 或 sudo 权限
 - 稳定的互联网连接
@@ -87,6 +89,7 @@ mkdir -p ~/.local/share/worldpainter/
 ```
 
 配置 WorldPainter 内存设置：
+
 ```bash
 sudo sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
 ```
@@ -130,6 +133,7 @@ mkdir -p workspace
 ```
 
 复制配置文件：
+
 ```bash
 cp config.example.yaml config.yaml
 # 根据您的需求编辑 config.yaml
@@ -149,6 +153,7 @@ mkdir -p ~/.local/share/worldpainter/config
 对于容器化设置，请使用 Docker：
 
 ### 前提条件
+
 - 系统上已安装 Docker
 
 ### 快速开始
@@ -172,6 +177,7 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 ### 运行生成器
 
 对于直接安装：
+
 ```bash
 # 设置系统限制
 ulimit -s unlimited
@@ -182,6 +188,7 @@ xvfb-run python3 main.py > generator.log
 ```
 
 对于 Docker 安装：
+
 ```bash
 # 容器自动运行，检查日志
 tail -f generator.log
@@ -190,6 +197,7 @@ tail -f generator.log
 ### 监控进度
 
 检查 `generator.log` 文件以获取进度更新：
+
 ```bash
 tail -f generator.log
 ```
@@ -229,6 +237,7 @@ tail -f generator.log
 ## 配置说明
 
 编辑 `config.yaml` 进行自定义：
+
 - `scripts_folder_path`: WorldPainter 脚本路径
 - `osm_folder_path`: OSM 数据文件路径
 - 处理参数和输出设置
