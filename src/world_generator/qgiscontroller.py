@@ -2,10 +2,10 @@ import os
 import sys
 
 from config import CONFIG
+import logging
 from tools import calculateTiles
-from logger import configure_logger
 
-logger = configure_logger("qgiscontroller")
+logger = logging.getLogger(__name__)
 
 
 def fix_geometry(projectPath: str,  algorithm: str, parameters: dict) -> str:
@@ -18,8 +18,8 @@ def fix_geometry(projectPath: str,  algorithm: str, parameters: dict) -> str:
         qgs = QgsApplication([], False)
         qgs.initQgis()
         # logger.info(self.qgs.showSettings())
-        from qgis import processing
         from processing.core.Processing import Processing
+        from qgis import processing
         Processing.initialize()
     except Exception as e:
         qgs.exitQgis()
@@ -56,10 +56,17 @@ def export_image(projectPath: str, block_per_tile: int,
     sys.path.append('/usr/share/qgis/python/plugins')
     from PyQt5.QtCore import QSize
     from qgis.core import (
-        QgsApplication, QgsProject, QgsPrintLayout,
-        QgsLayoutItemMap, QgsLayoutSize, QgsUnitTypes,
-        QgsRectangle, QgsLayoutPoint, QgsLayoutExporter,
-        QgsLayoutRenderContext)
+        QgsApplication,
+        QgsLayoutExporter,
+        QgsLayoutItemMap,
+        QgsLayoutPoint,
+        QgsLayoutRenderContext,
+        QgsLayoutSize,
+        QgsPrintLayout,
+        QgsProject,
+        QgsRectangle,
+        QgsUnitTypes,
+    )
 
     try:
         QgsApplication.setPrefixPath("/usr", True)
@@ -174,6 +181,13 @@ def export_image(projectPath: str, block_per_tile: int,
                     logger.info(f"Skipping {os.path.basename(outputName)}")
                     continue
                 _export_image(project, outputName, xMin, xMax, yMin, yMax)
+        uncheckAllLayers(project)
+    except Exception as e:
+        logger.error(f'QGIS export image error at {projectPath} {tile}: {e}')
+    # exit QGIS
+    del project
+    qgs.exitQgis()
+    # qgs.exit()
         uncheckAllLayers(project)
     except Exception as e:
         logger.error(f'QGIS export image error at {projectPath} {tile}: {e}')

@@ -1,23 +1,22 @@
+import logging
 import os
+import shutil
 import subprocess
 import sys
-import shutil
 
-from imageexport import imageExport
 from config import CONFIG
-from logger import configure_logger
+from imageexport import imageExport
 from magick import magickConvert
 from wpscript import wpGenerate
 
-logger = configure_logger("tiles")
+logger = logging.getLogger(__name__)
 
 
 def copyOSMFiles():
     # link all files from the OSM directory to the OSMDATA directory
     logger.info("linking/coping OSM files...")
-    src_dir = os.path.join(CONFIG['osm_folder_path'], 'all/')
-    dest_dir = os.path.join(
-        os.path.dirname(CONFIG['qgis_project_path']), 'OsmData/')
+    src_dir = os.path.join(CONFIG["osm_folder_path"], "all/")
+    dest_dir = os.path.join(os.path.dirname(CONFIG["qgis_project_path"]), "OsmData/")
 
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
@@ -30,7 +29,8 @@ def copyOSMFiles():
         if not CONFIG["osm_switch"][name]:
             logger.info(f"Skipping {file_name}, change source to empty")
             src_file = os.path.join(
-                os.path.dirname(CONFIG['qgis_project_path']), "empty.osm")
+                os.path.dirname(CONFIG["qgis_project_path"]), "empty.osm"
+            )
 
         if os.path.exists(dest_file):
             logger.info(f"Skipping {file_name} as it already exists")
@@ -49,33 +49,39 @@ def copyOSMFiles():
 def postProcessMap():
     # merge all the files
     logger.info("merging all the files...")
-    final_path = os.path.join(
-        CONFIG['scripts_folder_path'], CONFIG["world_name"])
+    final_path = os.path.join(CONFIG["scripts_folder_path"], CONFIG["world_name"])
     if not os.path.exists(final_path):
         os.makedirs(final_path)
-    final_region_path = os.path.join(final_path, 'region')
+    final_region_path = os.path.join(final_path, "region")
     if not os.path.exists(final_region_path):
         os.makedirs(final_region_path)
 
     wp_export_folder = os.path.join(
-        CONFIG['scripts_folder_path'], 'wpscript', 'exports')
+        CONFIG["scripts_folder_path"], "wpscript", "exports"
+    )
 
     for tile_folder in os.listdir(wp_export_folder):
-        for file_name in os.listdir(os.path.join(
-                wp_export_folder, tile_folder, 'region')):
-            src_file = os.path.join(
-                wp_export_folder, tile_folder, 'region', file_name)
+        for file_name in os.listdir(
+            os.path.join(wp_export_folder, tile_folder, "region")
+        ):
+            src_file = os.path.join(wp_export_folder, tile_folder, "region", file_name)
             dest_file = os.path.join(final_region_path, file_name)
             shutil.copy2(src_file, dest_file)
     logger.info("merging all the files done")
     # run minutor to generate the png
     logger.info("running minutor...")
-    o = subprocess.run([
-        "minutor", "--world",
-        final_path, "--depth", "319", "--savepng",
-        os.path.join(CONFIG['scripts_folder_path'],
-                     CONFIG["world_name"] + ".png")],
-        capture_output=True, text=True
+    o = subprocess.run(
+        [
+            "minutor",
+            "--world",
+            final_path,
+            "--depth",
+            "319",
+            "--savepng",
+            os.path.join(CONFIG["scripts_folder_path"], CONFIG["world_name"] + ".png"),
+        ],
+        capture_output=True,
+        text=True,
     )
     logger.info(f"minutor output: {o.stdout}")
     logger.error(f"minutor error: {o.stderr}")

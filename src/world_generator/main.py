@@ -1,11 +1,21 @@
-from logger import configure_logger
-from tiles import generateTiles
+import logging
+
 from preprocess import preprocessOSM
+from tiles import generateTiles
 
-logger = configure_logger("main")
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(module)s - %(message)s",
+    handlers=[
+        logging.FileHandler("generator.log"),
+        # logging.StreamHandler()
+    ],
+)
+
+logger = logging.getLogger(__name__)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logger.info("Starting the process...")
     preprocessOSM()
     generateTiles()
