@@ -18,7 +18,7 @@
 
 ### 系统要求
 
-- 基于 Debian/Ubuntu 的 Linux 发行版（在 Debian Bookworm 上测试）
+- 基于 Ubuntu 的 Linux 发行版（在 Ubuntu 24.04 LTS 上测试）
 - Root 或 sudo 权限
 - 稳定的互联网连接
 - 至少 8GB 内存（推荐 16GB+）
@@ -63,12 +63,12 @@ sudo apt install -y libpng-dev libjpeg-dev libtiff-dev imagemagick
 
 ```bash
 sudo apt install -y gnupg software-properties-common
-sudo mkdir -m755 -p /etc/apt/keyrings
+# sudo mkdir -m755 -p /etc/apt/keyrings # no need now
 sudo wget -O /etc/apt/keyrings/qgis-archive-keyring.gpg https://download.qgis.org/downloads/qgis-archive-keyring.gpg
 
 echo 'Types: deb deb-src' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'URIs: https://qgis.org/debian' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
-echo 'Suites: bookworm' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
+echo "Suites: $(lsb_release -cs)" | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Architectures: amd64' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Components: main' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Signed-By: /etc/apt/keyrings/qgis-archive-keyring.gpg' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
@@ -99,6 +99,8 @@ sudo sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
 下载并安装 Minutor 地图查看器：
 
 ```bash
+sudo apt update
+sudo apt install qtbase5-dev qtbase5-dev-tools libqt5widgets5 libqt5gui5 libqt5core5a
 wget -O /tmp/Minutor.Ubuntu-22.04.zip https://github.com/mrkite/minutor/releases/download/2.21.0/Minutor.Ubuntu-22.04.zip
 unzip /tmp/Minutor.Ubuntu-22.04.zip
 chmod +x minutor
