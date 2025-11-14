@@ -18,7 +18,7 @@ This guide provides step-by-step instructions to install all dependencies direct
 
 ### Prerequisites
 
-- Debian/Ubuntu-based Linux distribution (tested on Debian Bookworm)
+- Ubuntu-based Linux distribution (tested on Ubuntu 24.04 LTS)
 - Root or sudo access
 - Stable internet connection
 - At least 8GB RAM (recommended 16GB+)
@@ -43,10 +43,10 @@ sudo apt install -y python3-dev python3-pip python3-setuptools python3-wheel pyt
 
 ### Step 3: Java Runtime
 
-Install OpenJDK 17 and X11 dependencies:
+Install OpenJDK 21 and X11 dependencies:
 
 ```bash
-sudo apt install -y openjdk-17-jdk xserver-xorg xorg xvfb cmake libboost-dev
+sudo apt install -y openjdk-21-jdk xserver-xorg xorg xvfb cmake libboost-dev
 ```
 
 ### Step 4: Image Processing
@@ -63,12 +63,11 @@ Add QGIS repository and install QGIS:
 
 ```bash
 sudo apt install -y gnupg software-properties-common
-sudo mkdir -m755 -p /etc/apt/keyrings
 sudo wget -O /etc/apt/keyrings/qgis-archive-keyring.gpg https://download.qgis.org/downloads/qgis-archive-keyring.gpg
 
 echo 'Types: deb deb-src' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'URIs: https://qgis.org/debian' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
-echo 'Suites: bookworm' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
+echo "Suites: $(lsb_release -cs)" | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Architectures: amd64' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Components: main' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
 echo 'Signed-By: /etc/apt/keyrings/qgis-archive-keyring.gpg' | sudo tee -a /etc/apt/sources.list.d/qgis.sources
@@ -82,9 +81,9 @@ sudo apt install -y qgis qgis-plugin-grass
 Download and install WorldPainter:
 
 ```bash
-wget -O /tmp/worldpainter_2.21.0.deb https://www.worldpainter.net/files/worldpainter_2.21.0.deb
-sudo dpkg -i /tmp/worldpainter_2.21.0.deb
-rm /tmp/worldpainter_2.21.0.deb
+wget -O /tmp/worldpainter_2.26.1.deb https://www.worldpainter.net/files/worldpainter_2.26.1.deb
+sudo dpkg -i /tmp/worldpainter_2.26.1.deb
+rm /tmp/worldpainter_2.26.1.deb
 mkdir -p ~/.local/share/worldpainter/
 ```
 
@@ -99,7 +98,9 @@ sudo sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
 Download and install Minutor map viewer:
 
 ```bash
-wget -O /tmp/Minutor.Ubuntu-22.04.zip https://github.com/mrkite/minutor/releases/download/2.20.0/Minutor.Ubuntu-22.04.zip
+sudo apt update
+sudo apt install -y qtbase5-dev qtbase5-dev-tools libqt5widgets5 libqt5gui5 libqt5core5a
+wget -O /tmp/Minutor.Ubuntu-22.04.zip https://github.com/mrkite/minutor/releases/download/2.21.0/Minutor.Ubuntu-22.04.zip
 unzip /tmp/Minutor.Ubuntu-22.04.zip
 chmod +x minutor
 sudo mv minutor /usr/bin/
@@ -171,7 +172,31 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 ### Data Preparation
 
 1. Download required data files from [Tiles Installation Guide](https://earth.motfe.net/tiles-installation/)
-2. Extract all data files to the `Data` folder
+2. Extract all data files to the `Data` folder; the following is an example structure after setup:
+
+```plaintext
+Data/
+├── voidscript.js
+├── worldpainter-script.zip
+├── osm/(place .osm files under all/)
+│   └── all/
+├── qgis-bathymetry/
+├── qgis-heightmap/
+├── qgis-terrain/
+├── qgis-project/
+└── wpscript/
+    ├── backups/
+    ├── exports/
+    ├── farm/
+    ├── layer/
+    ├── ocean/
+    ├── ores/
+    ├── roads/
+    ├── schematics/
+    ├── terrain/
+    └── worldpainter_files/
+```
+
 3. Configure `config.yaml` according to your needs
 
 ### Running the Generator
@@ -209,7 +234,6 @@ tail -f generator.log
 ├── Data/                    # Data directory
 │   ├── voidscript.js
 │   ├── worldpainter-script.zip
-│   ├── wpscript/
 │   ├── osm/                 # OSM files location
 │   │   └── all/
 │   ├── qgis-bathymetry/     # Bathymetry data
@@ -227,11 +251,14 @@ tail -f generator.log
 │       ├── schematics/
 │       ├── terrain/
 │       └── worldpainter_files/
-├── Docker/                  # Docker configuration
+│   ├── Dockerfile           # Container image recipe
+│   └── docker-compose.yml   # Optional compose file
 ├── config.yaml              # Main configuration file
-├── main.py                  # Main application
-├── generator.log            # Runtime logs
-└── run.sh                   # Startup script
+-├── main.py                  # Main application
+-├── generator.log            # Runtime logs
+-└── run.sh                   # Startup script
+└── workspace/               # Default working/output directory
+    └── (tiles and outputs)
 ```
 
 ## Configuration
@@ -250,11 +277,11 @@ For detailed configuration options, see the example configuration file.
 
 1. **Permission denied errors**: Ensure you have proper file permissions
 2. **Memory issues**: Increase Java heap size in WorldPainter configuration
-3. **Display errors**: Make sure X11 forwarding is properly configured
+3. **Display errors**: Make sure X11 forwarding is properly configured, or use `xvfb-run`
 4. **Missing dependencies**: Re-run the installation steps for missing packages
 
 ### System Requirements
 
 - **Minimum**: 8GB RAM, 4 CPU cores, 50GB storage
 - **Recommended**: 16GB+ RAM, 8+ CPU cores, 100GB+ storage
-- **OS**: Debian/Ubuntu Linux (other distributions may require package name adjustments)
+- **OS**: Ubuntu 24.04 LTS (other Ubuntu-based distributions may require package name adjustments)
