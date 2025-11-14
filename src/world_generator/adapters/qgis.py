@@ -3,24 +3,25 @@ from __future__ import annotations
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, NoReturn, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, NoReturn
 
 _QGIS_INIT_RETRY = 3
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from qgis.core import QgsApplication, QgsProject, QgsPrintLayout, QgsRectangle
+    from qgis.core import QgsApplication, QgsPrintLayout, QgsProject, QgsRectangle
 else:
     try:
         # Defer import to runtime and suppress failures if not available
-        from qgis.core import QgsApplication, QgsProject, QgsPrintLayout, QgsRectangle
+        from qgis.core import QgsApplication, QgsPrintLayout, QgsProject, QgsRectangle
     except Exception:  # pragma: no cover - optional at import time
         QgsApplication = QgsProject = QgsPrintLayout = QgsRectangle = None
 
 
 class _MissingQgis:
     """Placeholder to delay ImportErrors until use."""
+
     def __getattr__(self, name: str) -> NoReturn:
         raise ImportError("QGIS is not installed or not available at expected paths.")
 
@@ -46,7 +47,9 @@ class QgisContext:
                     retry -= 1
                     logger.warning("QGIS init failed, retries left: %d", retry)
             else:
-                logger.error("Failed to initialize QGIS after %d attempts", _QGIS_INIT_RETRY)
+                logger.error(
+                    "Failed to initialize QGIS after %d attempts", _QGIS_INIT_RETRY
+                )
                 raise RuntimeError("QGIS initialization failed") from last_err
             self.app = app
         return self
@@ -59,16 +62,19 @@ class QgisContext:
                 logger.debug("exitQgis error: %s", e)
 
 
-def fix_geometry(project_path: Path | str, algorithm: str, parameters: dict[str, Any]) -> dict[str, Any]:
+def fix_geometry(
+    project_path: Path | str, algorithm: str, parameters: dict[str, Any]
+) -> dict[str, Any]:
     """Run a QGIS processing algorithm with minimal project initialization."""
     # Defer imports to function scope to keep modules importable without QGIS installed
     sys_path_add = "/usr/share/qgis/python/plugins"
     import sys
+
     if sys_path_add not in sys.path:
         sys.path.append(sys_path_add)
-    from qgis.core import QgsApplication, QgsProject
-    from processing.core.Processing import Processing
     from processing import processing as qgis_processing
+    from processing.core.Processing import Processing
+    from qgis.core import QgsApplication, QgsProject
 
     with QgisContext():
         proj = QgsProject.instance()
@@ -94,23 +100,24 @@ def export_image(
     # Defer imports/append to avoid import-time requirements
     sys_path_add = "/usr/share/qgis/python/plugins"
     import sys
+
     if sys_path_add not in sys.path:
         sys.path.append(sys_path_add)
     from PyQt5.QtCore import QSize
     from qgis.core import (
         QgsApplication,
-        QgsProject,
-        QgsPrintLayout,
-        QgsLayoutItemMap,
-        QgsLayoutSize,
-        QgsUnitTypes,
-        QgsRectangle,
-        QgsLayoutPoint,
         QgsLayoutExporter,
+        QgsLayoutItemMap,
+        QgsLayoutPoint,
         QgsLayoutRenderContext,
+        QgsLayoutSize,
+        QgsPrintLayout,
+        QgsProject,
+        QgsRectangle,
+        QgsUnitTypes,
     )
 
-    from .tiles import calculate_tiles
+    from ..utils.tiles import calculate_tiles
 
     image_output_folder = Path.cwd() / "image_exports"
     # In QGIS pipeline, folder is driven by caller; prefer a clear root override if needed
@@ -137,16 +144,27 @@ def export_image(
             if node:
                 node.setItemVisibilityChecked(True)
 
-    def _export(project: Any, output_name: Path, x_min: float, x_max: float, y_min: float, y_max: float) -> None:
+    def _export(
+        project: Any,
+        output_name: Path,
+        x_min: float,
+        x_max: float,
+        y_min: float,
+        y_max: float,
+    ) -> None:
         layout = QgsPrintLayout(project)
         layout.initializeDefaults()
         pages = layout.pageCollection()
-        pages.page(0).setPageSize(QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels))
+        pages.page(0).setPageSize(
+            QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels)
+        )
         map_item = QgsLayoutItemMap(layout)
         map_item.setRect(0, 0, block_per_tile, block_per_tile)
         map_item.setExtent(QgsRectangle(x_min, y_min, x_max, y_max))
         map_item.attemptMove(QgsLayoutPoint(0, 0, QgsUnitTypes.LayoutPixels))
-        map_item.attemptResize(QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels))
+        map_item.attemptResize(
+            QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels)
+        )
         layout.addLayoutItem(map_item)
         exporter = QgsLayoutExporter(layout)
         settings = QgsLayoutExporter.ImageExportSettings()
@@ -182,4 +200,3 @@ def export_image(
                     continue
                 _export(proj, out_path, x_min, x_max, y_min, y_max)
         uncheck_all(proj)
-

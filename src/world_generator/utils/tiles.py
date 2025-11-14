@@ -41,6 +41,6 @@ def deliver_osm_inputs(
             target.symlink_to(p)
         except (OSError, NotImplementedError):
             import shutil
+
             shutil.copy2(p, target)
     logger.info("OSM inputs linked to %s", dest)
-

@@ -5,14 +5,21 @@ import logging
 import sys
 from pathlib import Path
 
-from .log import setup_logging
-from .pipeline import run
+from .core.log import setup_logging
+from .stages.orchestration import run
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="world-generator")
-    p.add_argument("--config", "-c", type=Path, help="Path to config YAML (default: ./config.yaml)")
-    p.add_argument("--log-level", choices=["DEBUG","INFO","WARNING","ERROR"], default="INFO", help="Log level (default: INFO)")
+    p.add_argument(
+        "--config", "-c", type=Path, help="Path to config YAML (default: ./config.yaml)"
+    )
+    p.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Log level (default: INFO)",
+    )
     p.add_argument("--log-file", type=Path, help="Optional log file path")
     args = p.parse_args(argv)
     setup_logging(level=args.log_level, log_file=args.log_file)
@@ -29,4 +36,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

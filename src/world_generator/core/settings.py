@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
 import yaml
+
 from .types import OSMSwitch
 
 
@@ -31,7 +33,7 @@ class Config:
         _path = Path(path).expanduser().resolve()
         if not _path.exists():
             raise FileNotFoundError(f"Config file not found: {_path}")
-        with _path.open('r', encoding='utf-8') as f:
+        with _path.open("r", encoding="utf-8") as f:
             data: Dict[str, Any] = yaml.safe_load(f)
         # Minimal validation
         for field in cls.__dataclass_fields__:
@@ -51,3 +53,4 @@ class Config:
                 data[key] = Path(os.path.expandvars(data[key]))
         return cls(**data)  # type: ignore[arg-type]
 
+        return cls(**data)  # type: ignore[arg-type]
