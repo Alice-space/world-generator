@@ -167,3 +167,5 @@ generator.log
 *.zip.st
 *.zip.*
 *.zip.*.st
+Data/qgis-project
+Data/qgis-bathymetry

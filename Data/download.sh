@@ -3,7 +3,6 @@ set -euo pipefail
 
 # Plain-text list of URLs to download (edit as needed)
 URLS=(
-  http://earth.motfe.net/files/q34apCmsDcU4uJW1kU0L/worldpainter-script.zip
   http://earth.motfe.net/files/R4QWRfQxoiwx1BykrGVr/qgis-project.zip
   http://earth.motfe.net/files/TvIDZdSKPlx0p2b60eN0/qgis-bathymetry.zip
   https://earth.motfe.net/files/weWB9NxCTGTkL9nqkprt/qgis-terrain.zip
