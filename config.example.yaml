@@ -1,16 +1,41 @@
+# scripts_folder_path is now fixed to the repository's ./Data directory and no longer configurable.
+
+# === Data Sources ===
+# Path to the planet PBF file; OSM preprocessing reads and splits this dataset.
 pbf_path: "/workspace/Data/planet-latest.osm.pbf"
+
+# Directory containing the `all/` subfolder where per-layer .osm/.shp files are written.
 osm_folder_path: "/workspace/Data/osm/"
+
+# Primary QGIS project (land/vegetation/roads etc.) consumed by the export stage.
 qgis_project_path: "/workspace/Data/qgis-project/QGIS/MinecraftEarthTiles.qgz"
-scripts_folder_path: "/workspace/Data/"
+
+# Additional QGIS projects for bathymetry/terrain/heightmap rendering.
 qgis_bathymetry_project_path: "/workspace/Data/qgis-bathymetry/QGIS/MinecraftEarthTiles_Bathymetry.qgz"
 qgis_terrain_project_path: "/workspace/Data/qgis-terrain/QGIS/MinecraftEarthTiles_Terrain.qgz"
 qgis_heightmap_project_path: "/workspace/Data/qgis-heightmap/QGIS/MinecraftEarthTiles_Heightmap.qgz"
-use_heigh_quality_terrain: false
+
+# Toggle high-quality terrain exports.
+use_high_quality_terrain: false
+
+# === World Parameters ===
+# Minecraft save name; final world is written to `scripts_folder_path/<world_name>/`.
 world_name: Your_World_Name
+
+# Pixels/blocks per tile for both QGIS exports and WorldPainter worlds.
 blocks_per_tile: 512
+
+# Longitude/latitude span (in degrees) covered by a single tile (commonly 1 or 2).
 degree_per_tile: 2
+
+# Height scale applied by WorldPainter to map meters into Minecraft blocks.
 height_ratio: 50
+
+# Number of parallel workers for osmium, QGIS exports, ImageMagick, and WorldPainter.
 threads: 20
+
+# === Layer Switches ===
+# Disable specific OSM layers to save disk or simplify the final world.
 osm_switch:
   aerodrome: false
   bare_rock: true
@@ -35,4 +60,11 @@ osm_switch:
   water: true
   wetland: true
   vineyard: true
-rivers: rivers_small # rivers_small rivers_medium rivers_large  MajorRiversMany MajorRiversFew
+
+# QGIS river layer to export. Choose one of:
+#   - rivers_small: Dense network that keeps tributaries for detailed local maps.
+#   - rivers_medium: Balanced option (default) that trims very small streams.
+#   - rivers_large: Only major rivers; useful to reduce clutter on small worlds.
+#   - MajorRiversMany: Alternate dataset with more branches, derived from Natural Earth.
+#   - MajorRiversFew: Same dataset but only the largest trunks.
+rivers: rivers_small

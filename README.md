@@ -9,6 +9,8 @@ A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motf
 - [Direct Installation Guide](#direct-installation-guide)
 - [Docker Installation (Recommended)](#docker-installation-recommended)
 - [Usage](#usage)
+- [Processing Pipeline](#processing-pipeline)
+- [Inputs & Outputs](#inputs--outputs)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
 
@@ -227,49 +229,120 @@ Check the `generator.log` file for progress updates:
 tail -f generator.log
 ```
 
+## Processing Pipeline
+
+The `world_generator` package splits the workload into two major stages that you
+can run with `world-generator preprocess`, `world-generator tiles`, or the
+default `world-generator run` command (installed via `pip` or invoked with
+`python -m world_generator.cli`). Internally the pipeline is organized as
+follows:
+
+1. **Configuration & entry point** (`world_generator.cli`, `pipeline.py`):
+   reads `config.yaml` (or `WORLD_GENERATOR_CONFIG`) into a typed
+   `GeneratorConfig`, wires logging, and determines whether to run the full
+   pipeline or individual stages.
+2. **OSM preprocessing** (`preprocess.py`): `osmium` streams the planet extract
+   (`pbf_path`) and writes thematic `.osm` files under
+   `osm_folder_path/all/`. The optional `osm_switch` in the config lets you
+   disable specific layers (e.g., aerodromes or rivers).
+3. **Geometry fixing** (`qgiscontroller.fix_geometry`): offloads to QGIS to
+   generate cleaned `.shp` files for land cover layers that WorldPainter relies
+   on.
+4. **QGIS image exports** (`imageexport.py`): copies or symlinks the generated
+   OSM files into the QGIS project folder (`tiles.copy_osm_files`), then calls
+   QGIS in headless mode to export every selected layer tile-by-tile into
+   `scripts_folder_path/image_exports/<TILE>/`.
+5. **Heightmap resampling**: still in `imageexport.py`, `gdal_translate` crops
+   `HQheightmap.tif` into 16-bit PNGs inside each tile's `heightmap/` directory
+   so downstream tools have height data at `blocks_per_tile` resolution.
+6. **Image post-processing** (`magick.py`): ImageMagick normalizes palettes,
+   creates water masks, fills voids, and prepares reduced-color terrain assets
+   that match the WorldPainter script expectations.
+7. **WorldPainter automation** (`wpscript.py`): drives the `wpscript` CLI to
+   combine the exported rasters with the WorldPainter template contained in
+   `scripts_folder_path/wpscript/`, producing `.world` files and per-tile
+   `region/` exports. Each tile also receives a quick-look render via Minutor.
+8. **Packaging & overview** (`tiles.post_process_map`): merges the exported
+   `region/` directories into the final Minecraft save folder
+   `scripts_folder_path/<world_name>/region/`, then runs Minutor once more to
+   draw `<world_name>.png` as an at-a-glance map.
+
+## Inputs & Outputs
+
+### Key inputs
+
+| Input | Provided via | Notes |
+| --- | --- | --- |
+| `config.yaml` | Copy from `config.example.yaml` | Defines absolute paths for every dependency plus numeric knobs (`blocks_per_tile`, `degree_per_tile`, `threads`, etc.). |
+| OpenStreetMap PBF (`pbf_path`) | Download from Geofabrik/planet | Raw geography source that is split per theme. |
+| QGIS projects (`qgis_project_path`, `qgis_bathymetry_project_path`, `qgis_terrain_project_path`, `qgis_heightmap_project_path`) | Bundled separately in `Data/qgis-*` | Provide layer styling and layout definitions used during exports. |
+| WorldPainter scripts (`scripts_folder_path/wpscript`, `wpscript.js`, `voidscript.js`, `worldpainter-script.zip`) | Download from the Minecraft Earth Map guide | Consumed by `wpscript` to build `.world` files; keep the directory structure intact. |
+| Optional layer toggles (`osm_switch`, `rivers`) | `config.yaml` | Enable/disable generated shapefiles per theme and pick which river layer name to reference inside the QGIS project. |
+
+### Generated artifacts
+
+| Output | Location | Produced by |
+| --- | --- | --- |
+| Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `OSMPreprocessor.apply_file` |
+| Geometry-fixed shapefiles | `osm_folder_path/all/*.shp` | `qgiscontroller.fix_geometry` |
+| Per-tile rasters | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
+| Heightmaps (16-bit) | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
+| ImageMagick intermediates | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick` |
+| WorldPainter worlds | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world` | `wpscript.py` |
+| Tile exports | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca` | WorldPainter + Minutor automation |
+| Final Minecraft save | `scripts_folder_path/<world_name>/region/*.mca` | `tiles.post_process_map` |
+| Preview render | `scripts_folder_path/<world_name>.png` | Final Minutor call |
+| Logs | `generator.log` (or `--log-file`) | CLI logging configuration |
+
 ## Project Structure
 
 ```
 .
-├── Data/                    # Data directory
-│   ├── voidscript.js
-│   ├── worldpainter-script.zip
-│   ├── osm/                 # OSM files location
-│   │   └── all/
-│   ├── qgis-bathymetry/     # Bathymetry data
-│   ├── qgis-heightmap/      # Heightmap data
-│   ├── qgis-terrain/        # Terrain data
-│   ├── qgis-project/        # QGIS project files
-│   └── wpscript/            # WorldPainter scripts
-│       ├── backups/
-│       ├── exports/
-│       ├── farm/
-│       ├── layer/
-│       ├── ocean/
-│       ├── ores/
-│       ├── roads/
-│       ├── schematics/
-│       ├── terrain/
-│       └── worldpainter_files/
-│   ├── Dockerfile           # Container image recipe
-│   └── docker-compose.yml   # Optional compose file
-├── config.yaml              # Main configuration file
--├── main.py                  # Main application
--├── generator.log            # Runtime logs
--└── run.sh                   # Startup script
-└── workspace/               # Default working/output directory
-    └── (tiles and outputs)
+├── Data/                         # External assets (OSM, QGIS projects, wpscript, etc.)
+│   ├── osm/                      # Contains `all/` where preprocessed OSM/Shapefiles live
+│   ├── qgis-bathymetry/
+│   ├── qgis-heightmap/
+│   ├── qgis-terrain/
+│   ├── qgis-project/
+│   ├── wpscript/                 # Provided by the WorldPainter script pack
+│   ├── wpscript.js               # Automation entry point consumed by `wpscript`
+│   └── voidscript.js, worldpainter-script.zip, etc.
+├── Docker/                       # Container recipes (Dockerfile, compose examples)
+├── src/
+│   └── world_generator/
+│       ├── cli.py                # CLI entry point (`world-generator` console script)
+│       ├── pipeline.py           # High-level orchestrator for stages
+│       ├── preprocess.py         # OSM splitting + QGIS geometry fixes
+│       ├── tiles.py              # Tile workflow driver (QGIS export → WorldPainter)
+│       ├── imageexport.py        # Headless QGIS rendering helpers
+│       ├── magick.py             # ImageMagick-based raster cleanup
+│       ├── wpscript.py           # Calls the WorldPainter automation tool
+│       ├── qgiscontroller.py     # Thin wrappers around QGIS / PyQt APIs
+│       └── tools.py              # Shared helpers (tile naming)
+├── config.example.yaml           # Copy to config.yaml and customize paths
+├── pyproject.toml / requirements.txt # Python package + dependency metadata
+├── run.sh                        # Convenience wrapper for bare-metal runs
+├── README.md / README.zh.md      # Documentation (EN / 中文)
+└── generator.log (runtime)       # Created automatically unless --log-file overrides
 ```
 
 ## Configuration
 
-Edit `config.yaml` to customize:
+Edit `config.yaml` to customize (note: `scripts_folder_path` is fixed to `./Data` now):
 
-- `scripts_folder_path`: Path to WorldPainter scripts
 - `osm_folder_path`: Path to OSM data files
 - Processing parameters and output settings
 
 For detailed configuration options, see the example configuration file.
+
+### River Layer Options
+
+Set the `rivers` field in `config.yaml` to control which QGIS layer is exported into WorldPainter:
+- `rivers_small`: High-detail layer that keeps tributaries; best for zoomed-in or large worlds.
+- `rivers_medium`: Balanced density (default) that drops minor creeks while keeping secondary branches.
+- `rivers_large`: Only the widest rivers for minimal clutter on small worlds or stylized maps.
+- `MajorRiversMany`: Alternate Natural Earth–style dataset with extra branches compared to `rivers_large`.
+- `MajorRiversFew`: The sparsest Natural Earth variant, keeping just continental-scale trunks.
 
 ## Troubleshooting
 

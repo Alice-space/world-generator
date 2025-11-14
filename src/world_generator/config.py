@@ -8,6 +8,8 @@ from typing import Any, Mapping, MutableMapping
 import yaml
 
 CONFIG_ENV_VAR = "WORLD_GENERATOR_CONFIG"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SCRIPTS_FOLDER = (PACKAGE_ROOT / "Data").resolve()
 
 
 def _expand_path(value: str) -> Path:
@@ -105,7 +107,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         pbf_path=_expand_path(str(require("pbf_path"))),
         osm_folder_path=_expand_path(str(require("osm_folder_path"))),
         qgis_project_path=_expand_path(str(require("qgis_project_path"))),
-        scripts_folder_path=_expand_path(str(require("scripts_folder_path"))),
+        scripts_folder_path=DEFAULT_SCRIPTS_FOLDER,
         qgis_bathymetry_project_path=_expand_path(
             str(require("qgis_bathymetry_project_path"))
         ),

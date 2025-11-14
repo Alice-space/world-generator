@@ -9,6 +9,8 @@
 - [直接安装指南](#直接安装指南)
 - [Docker 安装（推荐）](#docker-安装推荐)
 - [使用方法](#使用方法)
+- [处理流程](#处理流程)
+- [输入与输出](#输入与输出)
 - [项目结构](#项目结构)
 - [配置说明](#配置说明)
 
@@ -204,44 +206,92 @@ tail -f generator.log
 tail -f generator.log
 ```
 
+## 处理流程
+
+`world_generator` 包分成两个主要阶段，可通过 `world-generator preprocess`、`world-generator tiles` 或默认的 `world-generator run`（`pip` 安装后或 `python -m world_generator.cli`）来执行。内部管线如下：
+
+1. **配置与入口**（`world_generator.cli`, `pipeline.py`）：读取 `config.yaml`（或 `WORLD_GENERATOR_CONFIG` 环境变量），构建类型安全的 `GeneratorConfig`，配置日志并决定运行整套流程还是单独阶段。
+2. **OSM 预处理**（`preprocess.py`）：使用 `osmium` 流式读取 `pbf_path` 指向的星球数据，按图层拆分并输出到 `osm_folder_path/all/*.osm`，`osm_switch` 可在配置里禁用特定图层。
+3. **几何修复**（`qgiscontroller.fix_geometry`）：调用 QGIS `fix geometries` 算法，生成清洗后的 `.shp` 文件供 WorldPainter 使用。
+4. **QGIS 影像导出**（`imageexport.py` 与 `tiles.copy_osm_files`）：将生成的 OSM 文件软链/复制到 QGIS 工程目录，然后在无头模式下为所有选定图层逐瓦片导出到 `scripts_folder_path/image_exports/<TILE>/`。
+5. **高度图重采样**：仍在 `imageexport.py` 内，`gdal_translate` 将 `HQheightmap.tif` 切片为 16bit PNG，输出到各瓦片的 `heightmap/` 目录，分辨率由 `blocks_per_tile` 决定。
+6. **图像后处理**（`magick.py`）：调用 ImageMagick 统一调色板、生成水体掩膜、填补空洞，并生成匹配 WorldPainter 模板的 `*_terrain_reduced_colors.png` 等资源。
+7. **WorldPainter 自动化**（`wpscript.py`）：驱动 `wpscript` CLI，把导出的栅格与 `scripts_folder_path/wpscript/` 中的模板组合，产出 `.world` 文件和每瓦片的 `region/` 导出，同时用 Minutor 渲染快速预览。
+8. **打包与概览**（`tiles.post_process_map`）：汇总所有瓦片的 `region/` 到最终世界目录 `scripts_folder_path/<world_name>/region/`，再用 Minutor 生成 `<world_name>.png` 总览图。
+
+## 输入与输出
+
+### 关键输入
+
+| 输入 | 配置方式 | 说明 |
+| --- | --- | --- |
+| `config.yaml` | 复制 `config.example.yaml` 并填写绝对路径 | 定义所有依赖位置以及数值参数（`blocks_per_tile`、`degree_per_tile`、`threads` 等）。 |
+| OpenStreetMap PBF (`pbf_path`) | 自行从 Geofabrik/planet 下载 | 原始地理数据，供预处理拆分。 |
+| QGIS 工程 (`qgis_project_path`、`qgis_bathymetry_project_path`、`qgis_terrain_project_path`、`qgis_heightmap_project_path`) | `Data/qgis-*` 目录 | 包含样式与布局设置，为各类图层导出提供模板。 |
+| WorldPainter 脚本集 (`scripts_folder_path/wpscript`、`wpscript.js`、`voidscript.js`、`worldpainter-script.zip`) | 参考 Minecraft Earth Map 指南下载 | `wpscript` 自动化运行所需的脚本与素材，目录结构需保持完整。 |
+| 可选图层开关 (`osm_switch`、`rivers`) | `config.yaml` | 控制哪些 OSM 图层要输出，以及 QGIS 工程引用的河流图层名称。 |
+
+### 生成产物
+
+| 输出 | 位置 | 由谁生成 |
+| --- | --- | --- |
+| 按主题拆分的 `.osm` | `osm_folder_path/all/*.osm` | `OSMPreprocessor.apply_file` |
+| 修复后的 `.shp` | `osm_folder_path/all/*.shp` | `qgiscontroller.fix_geometry` |
+| 每瓦片的图层栅格 | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
+| 16bit 高程图 | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `imageexport.py` 中的 `gdal_translate` 步骤 |
+| ImageMagick 中间件 | 同瓦片目录（如 `*_terrain_reduced_colors.png`） | `magick.run_magick` |
+| WorldPainter `.world` 文件 | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world` | `wpscript.py` |
+| 瓦片导出文件 | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca` | WorldPainter + Minutor 自动化 |
+| 最终 Minecraft 世界 | `scripts_folder_path/<world_name>/region/*.mca` | `tiles.post_process_map` |
+| 总览渲染图 | `scripts_folder_path/<world_name>.png` | 最后一次 Minutor 调用 |
+| 日志 | `generator.log`（或 `--log-file` 指定） | CLI 日志配置 |
+
 ## 项目结构
 
-```plaintext
+```
 .
-├── Data/                    # 数据目录
-│   ├── voidscript.js
-│   ├── worldpainter-script.zip
-│   ├── wpscript/
-│   ├── osm/                 # OSM 文件位置
-│   │   └── all/
-│   ├── qgis-bathymetry/     # 测深数据
-│   ├── qgis-heightmap/      # 高度图数据
-│   ├── qgis-terrain/        # 地形数据
-│   ├── qgis-project/        # QGIS 项目文件
-│   └── wpscript/            # WorldPainter 脚本
-│       ├── backups/
-│       ├── exports/
-│       ├── farm/
-│       ├── layer/
-│       ├── ocean/
-│       ├── ores/
-│       ├── roads/
-│       ├── schematics/
-│       ├── terrain/
-│       └── worldpainter_files/
-├── Docker/                  # Docker 配置
-├── config.yaml              # 主配置文件
-├── main.py                  # 主应用程序
-├── generator.log            # 运行时日志
-└── run.sh                   # 启动脚本
+├── Data/                         # 外部资产（OSM、QGIS 工程、wpscript 等）
+│   ├── osm/                      # 包含 `all/`，预处理输出位于此处
+│   ├── qgis-bathymetry/
+│   ├── qgis-heightmap/
+│   ├── qgis-terrain/
+│   ├── qgis-project/
+│   ├── wpscript/                 # WorldPainter 脚本包提供的模板
+│   ├── wpscript.js               # `wpscript` CLI 入口
+│   └── voidscript.js、worldpainter-script.zip 等资源
+├── Docker/                       # Dockerfile 与 compose 示例
+├── src/
+│   └── world_generator/
+│       ├── cli.py                # CLI 入口（`world-generator` 指令）
+│       ├── pipeline.py           # 流水线调度
+│       ├── preprocess.py         # OSM 拆分与 QGIS 几何修复
+│       ├── tiles.py              # 瓦片工作流驱动（QGIS → WorldPainter）
+│       ├── imageexport.py        # QGIS 影像导出工具
+│       ├── magick.py             # ImageMagick 栅格处理
+│       ├── wpscript.py           # WorldPainter 自动化调用
+│       ├── qgiscontroller.py     # QGIS / PyQt 封装
+│       └── tools.py              # 通用工具（瓦片编号等）
+├── config.example.yaml           # 复制为 config.yaml 并按需修改
+├── pyproject.toml / requirements.txt # Python 包与依赖声明
+├── run.sh                        # 本地运行脚本
+├── README.md / README.zh.md      # 文档（英文/中文）
+└── generator.log                 # 默认日志文件，可用 --log-file 指定
 ```
 
 ## 配置说明
 
-编辑 `config.yaml` 进行自定义：
+编辑 `config.yaml` 进行自定义（`scripts_folder_path` 现已固定为 `./Data`，无需配置）：
 
-- `scripts_folder_path`: WorldPainter 脚本路径
 - `osm_folder_path`: OSM 数据文件路径
 - 处理参数和输出设置
 
 有关详细的配置选项，请参阅示例配置文件。
+
+### 河流图层选项
+
+在 `config.yaml` 中通过 `rivers` 字段选择要导出的 QGIS 图层：
+- `rivers_small`：保留大量支流，细节最丰富，适合需要高精度的地图。
+- `rivers_medium`：默认方案，去掉最细小的溪流但保留次级分支，兼顾细节与性能。
+- `rivers_large`：仅保留最宽的河道，适合小世界或希望减少图层噪点的场景。
+- `MajorRiversMany`：来自 Natural Earth 的河网版本，分支较多，风格不同于标准层。
+- `MajorRiversFew`：同一数据集的精简版本，仅保留洲际主干河流。
