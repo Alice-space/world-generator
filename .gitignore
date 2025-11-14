@@ -165,3 +165,5 @@ config.yaml
 generator.log
 *.zip
 *.zip.st
+*.zip.*
+*.zip.*.st
