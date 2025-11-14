@@ -9,7 +9,6 @@ URLS=(
   https://earth.motfe.net/files/1WRmVLAz2gi7m8Z2qaWq/qgis-heightmap.zip.001
   https://earth.motfe.net/files/1WRmVLAz2gi7m8Z2qaWq/qgis-heightmap.zip.002
   https://earth.motfe.net/files/1WRmVLAz2gi7m8Z2qaWq/qgis-heightmap.zip.003
-  https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf
 )
 
 # Verify axel is available
