@@ -1,168 +1,139 @@
+"""WorldPainter asset preparation powered by ImageMagick."""
+
 import logging
 import multiprocessing as mp
-import os
 import subprocess
+from pathlib import Path
 
 import pebble
-from config import CONFIG
-from tools import calculateTiles
 
-image_output_folder = os.path.join(CONFIG["scripts_folder_path"], "image_exports")
+from .config import GeneratorConfig
+from .tools import calculateTiles
+
 logger = logging.getLogger(__name__)
 
 
-def runMagick(tile: str, blocks_per_tile: int):
-    logger.info(f"Magick for {tile}...")
+def run_magick(config: GeneratorConfig, tile: str) -> None:
+    logger.info("Magick for %s", tile)
     std_out = ""
     std_err = ""
-    tile_folder = os.path.join(image_output_folder, tile)
-    if not os.path.exists(tile_folder):
-        os.makedirs(tile_folder)
+    image_output_folder = config.image_exports_dir
+    tile_folder = image_output_folder / tile
+    tile_folder.mkdir(parents=True, exist_ok=True)
+    (tile_folder / "heightmap").mkdir(parents=True, exist_ok=True)
 
-    # skip if already done
-    if os.path.exists(os.path.join(tile_folder, f"{tile}_terrain_reduced_colors.png")):
-        logger.info(f"Skipping Magick for {tile}")
+    if (tile_folder / f"{tile}_terrain_reduced_colors.png").exists():
+        logger.info("Skipping Magick for %s", tile)
         return
 
-    o = subprocess.run(
+    def _run(args: list[str | Path]) -> subprocess.CompletedProcess[str]:
+        result = subprocess.run(
+            [str(arg) for arg in args], capture_output=True, text=True
+        )
+        nonlocal std_out, std_err
+        std_out += result.stdout
+        std_err += result.stderr
+        return result
+
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_water.png"),
-            os.path.join(tile_folder, f"{tile}_water_temp.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_water.png",
+            tile_folder / f"{tile}_water_temp.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_river.png"),
-            os.path.join(tile_folder, f"{tile}_river_temp.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_river.png",
+            tile_folder / f"{tile}_river_temp.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_water_temp.png"),
+            tile_folder / f"{tile}_water_temp.png",
             "-draw",
             "point 1,1",
             "-fill",
             "black",
-            os.path.join(tile_folder, f"{tile}_water_temp.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_water_temp.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_river_temp.png"),
+            tile_folder / f"{tile}_river_temp.png",
             "-draw",
             "point 1,1",
             "-fill",
             "black",
-            os.path.join(tile_folder, f"{tile}_river_temp.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_river_temp.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
             "-negate",
-            os.path.join(tile_folder, f"{tile}_water_temp.png"),
+            tile_folder / f"{tile}_water_temp.png",
             "-threshold",
             "1%%",
-            os.path.join(tile_folder, f"{tile}_water_mask.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_water_mask.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
             "-negate",
-            os.path.join(tile_folder, f"{tile}_river_temp.png"),
+            tile_folder / f"{tile}_river_temp.png",
             "-threshold",
             "1%%",
-            os.path.join(tile_folder, f"{tile}_river_mask.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_river_mask.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_water_mask.png"),
+            tile_folder / f"{tile}_water_mask.png",
             "-transparent",
             "black",
-            os.path.join(tile_folder, f"{tile}_water_mask.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_water_mask.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_river_mask.png"),
+            tile_folder / f"{tile}_river_mask.png",
             "-transparent",
             "black",
-            os.path.join(tile_folder, f"{tile}_river_mask.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_river_mask.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "composite",
             "-gravity",
             "center",
-            os.path.join(tile_folder, f"{tile}_water_mask.png"),
-            os.path.join(tile_folder, f"{tile}_river_mask.png"),
-            os.path.join(tile_folder, f"{tile}_water_transparent.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_water_mask.png",
+            tile_folder / f"{tile}_river_mask.png",
+            tile_folder / f"{tile}_water_transparent.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_exported.png"),
+            tile_folder / "heightmap" / f"{tile}_exported.png",
             "-transparent",
             "black",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_removed_invalid.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_removed_invalid.png"),
+            tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
             "-channel",
             "A",
             "-morphology",
@@ -170,25 +141,21 @@ def runMagick(tile: str, blocks_per_tile: int):
             "Diamond",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_edges.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_edges.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
     cond = """( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% )""".split()
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_edges.png"),
+            tile_folder / "heightmap" / f"{tile}_edges.png",
             *cond,
             "-layers",
             "RemoveDups",
             "-filter",
             "Gaussian",
             "-resize",
-            f"{blocks_per_tile}x{blocks_per_tile}!",
+            f"{config.blocks_per_tile}x{config.blocks_per_tile}!",
             "-reverse",
             "-background",
             "None",
@@ -197,66 +164,50 @@ def runMagick(tile: str, blocks_per_tile: int):
             "off",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_invalid_filled.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_invalid_filled.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_invalid_filled.png"),
-            os.path.join(tile_folder, "heightmap", f"{tile}_removed_invalid.png"),
+            tile_folder / "heightmap" / f"{tile}_invalid_filled.png",
+            tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
             "-compose",
             "over",
             "-composite",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_unsmoothed.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_unsmoothed.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_unsmoothed.png"),
-            os.path.join(tile_folder, f"{tile}_water_transparent.png"),
+            tile_folder / "heightmap" / f"{tile}_unsmoothed.png",
+            tile_folder / f"{tile}_water_transparent.png",
             "-compose",
             "over",
             "-composite",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_blacked.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_water_blacked.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_blacked.png"),
+            tile_folder / "heightmap" / f"{tile}_water_blacked.png",
             "-transparent",
             "white",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_removed.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_water_removed.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_removed.png"),
+            tile_folder / "heightmap" / f"{tile}_water_removed.png",
             "-channel",
             "A",
             "-morphology",
@@ -264,141 +215,108 @@ def runMagick(tile: str, blocks_per_tile: int):
             "Diamond",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_edges.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_water_edges.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    cond = f'( +clone -channel A -morphology EdgeIn Diamond +channel +write sparse-color:{os.path.join(tile_folder,"heightmap", f"{tile}vf.txt")} -sparse-color Voronoi @{os.path.join(tile_folder, "heightmap",f"{tile}vf.txt")}  -alpha off -depth 16 )'.split()
-    o = subprocess.run(
+    cond = f'( +clone -channel A -morphology EdgeIn Diamond +channel +write sparse-color:{tile_folder / "heightmap" / f"{tile}vf.txt"} -sparse-color Voronoi @{tile_folder / "heightmap" / f"{tile}vf.txt"}  -alpha off -depth 16 )'.split()
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_edges.png"),
+            tile_folder / "heightmap" / f"{tile}_water_edges.png",
             *cond,
             "-compose",
             "DstOver",
             "-composite",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_filled.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_water_filled.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_filled.png"),
+            tile_folder / "heightmap" / f"{tile}_water_filled.png",
             "-level",
             "0.002%%,100.002%%",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_filled.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}_water_filled.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_filled.png"),
-            os.path.join(tile_folder, "heightmap", f"{tile}_water_removed.png"),
+            tile_folder / "heightmap" / f"{tile}_water_filled.png",
+            tile_folder / "heightmap" / f"{tile}_water_removed.png",
             "-compose",
             "over",
             "-composite",
             "-depth",
             "16",
-            os.path.join(tile_folder, "heightmap", f"{tile}.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / "heightmap" / f"{tile}.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}.png"),
+            tile_folder / f"{tile}.png",
             "-blur",
             "5",
-            os.path.join(tile_folder, f"{tile}.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_climate.png"),
+            tile_folder / f"{tile}_climate.png",
             "-sample",
             "50%%",
             "-magnify",
             "-define",
             "png:color-type=6",
-            os.path.join(tile_folder, f"{tile}_climate.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_climate.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    o = subprocess.run(
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_ocean_temp.png"),
+            tile_folder / f"{tile}_ocean_temp.png",
             "-sample",
             "12.5%%",
             "-magnify",
             "-magnify",
             "-magnify",
-            os.path.join(tile_folder, f"{tile}_ocean_temp.png"),
-        ],
-        capture_output=True,
-        text=True,
+            tile_folder / f"{tile}_ocean_temp.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    scripts_folder_path = CONFIG["scripts_folder_path"]
-    o = subprocess.run(
+    scripts_folder_path = config.scripts_folder_path
+    _run(
         [
             "convert",
-            os.path.join(tile_folder, f"{tile}_terrain.png"),
+            tile_folder / f"{tile}_terrain.png",
             "-dither",
             "None",
             "-remap",
-            os.path.join(scripts_folder_path, "wpscript", "terrain", "Standard.png"),
-            os.path.join(tile_folder, f"{tile}_terrain_reduced_colors.png"),
-        ],
-        capture_output=True,
-        text=True,
+            scripts_folder_path / "wpscript" / "terrain" / "Standard.png",
+            tile_folder / f"{tile}_terrain_reduced_colors.png",
+        ]
     )
-    std_out += o.stdout
-    std_err += o.stderr
-    logger.info(f"Magick for {tile} output: {std_out}")
-    if std_err:
-        logger.error(f"Magick for {tile} error: {std_err}")
+    if std_out.strip():
+        logger.info("Magick for %s output: %s", tile, std_out.strip())
+    if std_err.strip():
+        logger.error("Magick for %s error: %s", tile, std_err.strip())
 
 
-def magickConvert():
-    degree_per_tile = CONFIG["degree_per_tile"]
-    blocks_per_tile = CONFIG["blocks_per_tile"]
+def magick_convert(config: GeneratorConfig) -> None:
+    degree_per_tile = config.degree_per_tile
     pool = pebble.ProcessPool(
-        max_workers=CONFIG["threads"], max_tasks=1, context=mp.get_context("forkserver")
+        max_workers=config.threads,
+        max_tasks=1,
+        context=mp.get_context("forkserver"),
     )
-    for xMin in range(-180, 180, degree_per_tile):
-        for yMin in range(-90, 90, degree_per_tile):
-            tile = calculateTiles(xMin, yMin + degree_per_tile)
-            pool.schedule(
-                runMagick,
-                (
-                    tile,
-                    blocks_per_tile,
-                ),
-            )
+    for x_min in range(-180, 180, degree_per_tile):
+        for y_min in range(-90, 90, degree_per_tile):
+            tile = calculateTiles(x_min, y_min + degree_per_tile)
+            pool.schedule(run_magick, [config, tile])
     pool.close()
     pool.join()
-    logger.info(f"magickConvert {tile} done")
+    logger.info("magickConvert done")
+
+
+__all__ = ["run_magick", "magick_convert"]

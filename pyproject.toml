@@ -7,19 +7,11 @@ name = "world-generator"
 version = "0.0.1"
 description = "Minecraft world generator in parallel"
 readme = "README.md"
-requires-python = ">=3.9"
-dependencies = [
-    "PyYAML>=6.0",
-    "osmium",
-    "pebble",
-]
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0", "osmium", "pebble"]
 
 [project.optional-dependencies]
-dev = [
-    "mypy>=1.0",
-    "flake8>=5.0",
-    "black>=23.0",
-]
+dev = ["mypy>=1.0", "flake8>=5.0", "black>=23.0"]
 test = ["pytest>=7.0"]
 
 [project.urls]
@@ -43,4 +35,8 @@ target-version = ['py39']
 python_version = "3.9"
 warn_unused_ignores = true
 disallow_untyped_defs = true
+mypy_path = "src"
 
+[[tool.mypy.overrides]]
+module = ["PyQt5.*", "qgis.*", "processing.*"]
+ignore_missing_imports = true
