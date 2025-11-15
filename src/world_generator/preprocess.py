@@ -288,7 +288,6 @@ def _run_osmium_stage(
         "osmium",
         "tags-filter",
         "--overwrite",
-        "-r",  # short flag works on older osmium versions too
         "-o",
         str(target),
         "-f",
