@@ -13,9 +13,22 @@ DEFAULT_SCRIPTS_FOLDER = (PACKAGE_ROOT / "Data").resolve()
 
 
 def _expand_path(value: str) -> Path:
-    """Normalize user provided paths."""
+    """Normalize user provided paths.
 
-    return Path(value).expanduser().resolve()
+    - Expand user home and environment variables.
+    - If the resulting path is relative, resolve it against the current working
+    directory (pwd). This supports writing relative paths like
+    "Data/qgis-project/QGIS/project.qgz" in config.yaml.
+    """
+    expanded = str(Path(value).expanduser())
+    path_obj = Path(expanded)
+    if not path_obj.is_absolute():
+        # Anchor relative paths to pwd, consistent with user expectation
+        path_obj = Path.cwd() / path_obj
+    # Final resolve to normalize: handle ".." and symlinks if possible.
+    # We don't set strict=True here to avoid errors when the target does not
+    # exist yet (e.g., output paths which will be created by the pipeline).
+    return path_obj.resolve()
 
 
 @dataclass(frozen=True)
