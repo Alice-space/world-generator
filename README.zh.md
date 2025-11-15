@@ -112,13 +112,28 @@ rm /tmp/Minutor.Ubuntu-22.04.zip
 
 ### 步骤 8：Python 依赖项
 
-安装所需的 Python 包：
+创建并激活虚拟环境，然后安装所需的 Python 包：
 
 ```bash
-pip install osmium pebble pyyaml --break-system-packages
+python3 -m venv venv
+source venv/bin/activate
+pip install -U pip setuptools wheel
+pip install osmium pebble pyyaml
 ```
 
-### 步骤 9：ImageMagick 配置
+> 在后续步骤中如需运行 Python 脚本，请确保虚拟环境已激活。或使用 `venv/bin/python` 完整路径调用。
+
+### 步骤 9：osmium-tool（可选）
+
+如果您需要使用 `osmium` 命令行工具处理 OSM 数据，可安装：
+
+```bash
+sudo apt install -y osmium-tool
+```
+
+**注意**：这不是 Python 包 `osmium`（pyosmium），而是独立的命令行工具，通常用于与 OSM 数据（.osm.pbf）相关的额外处理。本项目主要使用 Python 的 pyosmium 库，osmium-tool 仅在需要额外命令行操作时使用。
+
+### 步骤 10：ImageMagick 配置
 
 删除限制性的 ImageMagick 策略：
 
@@ -126,7 +141,7 @@ pip install osmium pebble pyyaml --break-system-packages
 sudo rm /etc/ImageMagick-6/policy.xml
 ```
 
-### 步骤 10：项目设置
+### 步骤 11：项目设置
 
 克隆仓库并设置工作区：
 
@@ -143,7 +158,7 @@ cp config.example.yaml config.yaml
 # 根据您的需求编辑 config.yaml
 ```
 
-### 步骤 11：配置文件设置
+### 步骤 12：配置文件设置
 
 创建必要的配置目录：
 
@@ -187,8 +202,14 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 ulimit -s unlimited
 ulimit -n 100000
 
-# 使用虚拟显示运行
+# 使用虚拟显示运行（如已激活虚拟环境）
 xvfb-run python3 main.py > generator.log
+```
+
+若未激活虚拟环境，可使用虚拟环境中的 Python 解释器运行：
+
+```bash
+xvfb-run venv/bin/python main.py > generator.log
 ```
 
 对于 Docker 安装：

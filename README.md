@@ -111,13 +111,28 @@ rm /tmp/Minutor.Ubuntu-22.04.zip
 
 ### Step 8: Python Dependencies
 
-Install required Python packages:
+Create and activate a virtual environment, then install required Python packages:
 
 ```bash
-pip install osmium pebble pyyaml --break-system-packages
+python3 -m venv venv
+source venv/bin/activate
+pip install -U pip setuptools wheel
+pip install osmium pebble pyyaml
 ```
 
-### Step 9: ImageMagick Configuration
+> Make sure to activate the virtual environment before running Python scripts, or invoke using the full path `venv/bin/python`.
+
+### Step 9: osmium-tool (optional)
+
+If you need the `osmium` CLI for processing OSM data (`.osm.pbf`), install it via:
+
+```bash
+sudo apt install -y osmium-tool
+```
+
+**Note**: This is not the Python package `osmium` (pyosmium), but the separate command-line tool. The project primarily uses pyosmium; osmium-tool is only needed for additional CLI operations.
+
+### Step 10: ImageMagick Configuration
 
 Remove restrictive ImageMagick policy:
 
@@ -125,7 +140,7 @@ Remove restrictive ImageMagick policy:
 sudo rm /etc/ImageMagick-6/policy.xml
 ```
 
-### Step 10: Project Setup
+### Step 11: Project Setup
 
 Clone the repository and set up the workspace:
 
@@ -142,7 +157,7 @@ cp config.example.yaml config.yaml
 # Edit config.yaml according to your needs
 ```
 
-### Step 11: Configuration Files Setup
+### Step 12: Configuration Files Setup
 
 Create necessary configuration directories:
 
