@@ -34,11 +34,7 @@ def copy_osm_files(config: GeneratorConfig) -> None:
         if dest_file.exists():
             logger.info("Skipping %s as it already exists", file_path.name)
             continue
-
-        if sys.platform == "win32":
-            shutil.copy2(source, dest_file)
-        else:
-            os.symlink(source, dest_file)
+        os.symlink(source, dest_file)
     logger.info("OSM file linking complete")
 
 
