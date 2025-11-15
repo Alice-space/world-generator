@@ -1,10 +1,11 @@
 # scripts_folder_path is now fixed to the repository's ./Data directory and no longer configurable.
 
 # === Data Sources ===
-# Path to the planet PBF file; OSM preprocessing reads and splits this dataset.
+# Path to the planet PBF file; absolute paths or ones relative to `pwd` both work.
 pbf_path: "/workspace/Data/planet-latest.osm.pbf"
 
 # Directory containing the `all/` subfolder where per-layer .osm/.shp files are written.
+# Absolute or pwd-relative paths are supported.
 osm_folder_path: "/workspace/Data/osm/"
 
 # Primary QGIS project (land/vegetation/roads etc.) consumed by the export stage.

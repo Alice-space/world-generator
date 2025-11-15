@@ -20,7 +20,7 @@ def _expand_path(value: str) -> Path:
     directory (pwd). This supports writing relative paths like
     "Data/qgis-project/QGIS/project.qgz" in config.yaml.
     """
-    expanded = str(Path(value).expanduser())
+    expanded = os.path.expandvars(str(Path(value).expanduser()))
     path_obj = Path(expanded)
     if not path_obj.is_absolute():
         # Anchor relative paths to pwd, consistent with user expectation
