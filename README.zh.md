@@ -118,22 +118,33 @@ rm /tmp/Minutor.Ubuntu-22.04.zip
 python3 -m venv venv
 source venv/bin/activate
 pip install -U pip setuptools wheel
-pip install osmium pebble pyyaml
+pip install geopandas pebble pyyaml shapely
 ```
 
 > 在后续步骤中如需运行 Python 脚本，请确保虚拟环境已激活。或使用 `venv/bin/python` 完整路径调用。
 
-### 步骤 9：osmium-tool（可选）
+### 步骤 9：GDAL / ogr2ogr
 
-如果您需要使用 `osmium` 命令行工具处理 OSM 数据，可安装：
+安装 GDAL，使 `ogr2ogr` 可用于矢量格式转换：
+
+```bash
+sudo apt install -y gdal-bin
+```
+
+### 步骤 10：安装 osmium-tool（必需）
+
+安装 `osmium` 命令行工具；`preprocess.py` 会调用 `osmium tags-filter`
+完成多线程图层提取，因此此步骤为必选：
 
 ```bash
 sudo apt install -y osmium-tool
 ```
 
-**注意**：这不是 Python 包 `osmium`（pyosmium），而是独立的命令行工具，通常用于与 OSM 数据（.osm.pbf）相关的额外处理。本项目主要使用 Python 的 pyosmium 库，osmium-tool 仅在需要额外命令行操作时使用。
+**注意**：这不是 Python 包 `osmium`（pyosmium），而是独立的 C++
+命令行工具。生成器直接通过子进程调用该 CLI，请确保它在 `PATH`
+中可用。
 
-### 步骤 10：ImageMagick 配置
+### 步骤 11：ImageMagick 配置
 
 删除限制性的 ImageMagick 策略：
 
@@ -141,7 +152,7 @@ sudo apt install -y osmium-tool
 sudo rm /etc/ImageMagick-6/policy.xml
 ```
 
-### 步骤 11：项目设置
+### 步骤 12：项目设置
 
 克隆仓库并设置工作区：
 
@@ -158,7 +169,7 @@ cp config.example.yaml config.yaml
 # 根据您的需求编辑 config.yaml
 ```
 
-### 步骤 12：配置文件设置
+### 步骤 13：配置文件设置
 
 创建必要的配置目录：
 
@@ -232,8 +243,10 @@ tail -f generator.log
 `world_generator` 包分成两个主要阶段，可通过 `world-generator preprocess`、`world-generator tiles` 或默认的 `world-generator run`（`pip` 安装后或 `python -m world_generator.cli`）来执行。内部管线如下：
 
 1. **配置与入口**（`world_generator.cli`, `pipeline.py`）：读取 `config.yaml`（或 `WORLD_GENERATOR_CONFIG` 环境变量），构建类型安全的 `GeneratorConfig`，配置日志并决定运行整套流程还是单独阶段。
-2. **OSM 预处理**（`preprocess.py`）：使用 `osmium` 流式读取 `pbf_path` 指向的星球数据，按图层拆分并输出到 `osm_folder_path/all/*.osm`，`osm_switch` 可在配置里禁用特定图层。
-3. **几何修复**（`qgiscontroller.fix_geometry`）：调用 QGIS `fix geometries` 算法，生成清洗后的 `.shp` 文件供 WorldPainter 使用。
+2. **OSM 预处理**（`preprocess.py`）：调度多个 `osmium tags-filter` CLI
+   命令（每个图层一个）并行读取 `pbf_path`，输出到
+   `osm_folder_path/all/*.osm`，`osm_switch` 可在配置里禁用特定图层。
+3. **几何修复**（`ogr2ogr` + GeoPandas）：借助 GDAL 将 `.osm` 图层转换为 `.shp`，并使用 `GeoSeries.make_valid()` 清理几何，确保 QGIS/WorldPainter 可稳定读取。
 4. **QGIS 影像导出**（`imageexport.py` 与 `tiles.copy_osm_files`）：将生成的 OSM 文件软链/复制到 QGIS 工程目录，然后在无头模式下为所有选定图层逐瓦片导出到 `scripts_folder_path/image_exports/<TILE>/`。
 5. **高度图重采样**：仍在 `imageexport.py` 内，`gdal_translate` 将 `HQheightmap.tif` 切片为 16bit PNG，输出到各瓦片的 `heightmap/` 目录，分辨率由 `blocks_per_tile` 决定。
 6. **图像后处理**（`magick.py`）：调用 ImageMagick 统一调色板、生成水体掩膜、填补空洞，并生成匹配 WorldPainter 模板的 `*_terrain_reduced_colors.png` 等资源。
@@ -256,8 +269,8 @@ tail -f generator.log
 
 | 输出 | 位置 | 由谁生成 |
 | --- | --- | --- |
-| 按主题拆分的 `.osm` | `osm_folder_path/all/*.osm` | `OSMPreprocessor.apply_file` |
-| 修复后的 `.shp` | `osm_folder_path/all/*.shp` | `qgiscontroller.fix_geometry` |
+| 按主题拆分的 `.osm` | `osm_folder_path/all/*.osm` | `osmium tags-filter` 流程 |
+| 修复后的 `.shp` | `osm_folder_path/all/*.shp` | `ogr2ogr` + GeoPandas |
 | 每瓦片的图层栅格 | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
 | 16bit 高程图 | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `imageexport.py` 中的 `gdal_translate` 步骤 |
 | ImageMagick 中间件 | 同瓦片目录（如 `*_terrain_reduced_colors.png`） | `magick.run_magick` |
@@ -285,7 +298,7 @@ tail -f generator.log
 │   └── world_generator/
 │       ├── cli.py                # CLI 入口（`world-generator` 指令）
 │       ├── pipeline.py           # 流水线调度
-│       ├── preprocess.py         # OSM 拆分与 QGIS 几何修复
+│       ├── preprocess.py         # 调用 osmium CLI 进行 OSM 拆分 + GDAL/GeoPandas 几何修复
 │       ├── tiles.py              # 瓦片工作流驱动（QGIS → WorldPainter）
 │       ├── imageexport.py        # QGIS 影像导出工具
 │       ├── magick.py             # ImageMagick 栅格处理

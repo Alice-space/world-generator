@@ -2,14 +2,17 @@
 
 import logging
 import multiprocessing as mp
+import os
+import subprocess
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Iterable, Mapping, Sequence
 
-import osmium
+import geopandas as gpd
 import pebble
 
 from .config import GeneratorConfig
-from .qgiscontroller import fix_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +46,11 @@ OSM_POSTFIX: dict[str, tuple[str, str]] = {
     "urban": ("urban", "|layername=multipolygons"),
     "broadleaved": (
         "forest",
-        '|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"broadleaved"\'',
+        '\'|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"broadleaved"\'',
     ),
     "needleleaved": (
         "forest",
-        '|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"needleleaved"\'',
+        '\'|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"needleleaved"\'',
     ),
     "mixedforest": ("forest", "|layername=multipolygons"),
     "beach": ("beach", "|layername=multipolygons"),
@@ -62,143 +65,128 @@ OSM_POSTFIX: dict[str, tuple[str, str]] = {
 }
 
 
-class OSMPreprocessor(osmium.SimpleHandler):
-    """Split planet data into thematic layers for downstream steps."""
+@dataclass(frozen=True)
+class FilterStage:
+    """Represents one `osmium tags-filter` pass."""
 
-    def __init__(self, output_folder: Path) -> None:
-        super().__init__()
-        self.output_folder = output_folder
-        self.highway_writer = self._writer("highway.osm")
-        self.big_road_writer = self._writer("big_road.osm")
-        self.middle_road_writer = self._writer("middle_road.osm")
-        self.small_road_writer = self._writer("small_road.osm")
-        self.stream_writer = self._writer("stream.osm")
-        self.aerodrome_writer = self._writer("aerodrome.osm")
-        self.urban_writer = self._writer("urban.osm")
-        self.stateborder_writer = self._writer("stateborder.osm")
-        self.water_writer = self._writer("water.osm")
-        self.wetland_writer = self._writer("wetland.osm")
-        self.swamp_writer = self._writer("swamp.osm")
-        self.river_writer = self._writer("river.osm")
-        self.glacier_writer = self._writer("glacier.osm")
-        self.volcano_writer = self._writer("volcano.osm")
-        self.beach_writer = self._writer("beach.osm")
-        self.forest_writer = self._writer("forest.osm")
-        self.farmland_writer = self._writer("farmland.osm")
-        self.vineyard_writer = self._writer("vineyard.osm")
-        self.meadow_writer = self._writer("meadow.osm")
-        self.grass_writer = self._writer("grass.osm")
-        self.quarry_writer = self._writer("quarry.osm")
-        self.bare_rock_writer = self._writer("bare_rock.osm")
-        self.border_writer = self._writer("border.osm")
+    expressions: tuple[str, ...]
 
-    def _writer(self, filename: str) -> osmium.SimpleWriter:
-        return osmium.SimpleWriter(str(self.output_folder / filename))
 
-    def node(self, node: Any) -> None:  # pragma: no cover - exercised via osmium
-        self._process(node, "add_node")
+def _expr(key: str, values: Sequence[str], obj_type: str | None = None) -> str:
+    prefix = f"{obj_type}/" if obj_type else ""
+    joined = ",".join(values)
+    return f"{prefix}{key}={joined}"
 
-    def way(self, way: Any) -> None:  # pragma: no cover - exercised via osmium
-        self._process(way, "add_way")
 
-    def relation(self, relation: Any) -> None:  # pragma: no cover
-        self._process(relation, "add_relation")
+def _landuse_stage(values: Sequence[str]) -> FilterStage:
+    return FilterStage(
+        (
+            _expr("landuse", values, "w"),
+            _expr("landuse", values, "r"),
+        )
+    )
 
-    def _process(self, element: Any, writer_method: str) -> None:
-        highway_tag = element.tags.get("highway")
-        waterway_tag = element.tags.get("waterway")
-        aeroway_tag = element.tags.get("aeroway")
-        landuse_tag = element.tags.get("landuse")
-        boundary_tag = element.tags.get("boundary")
-        admin_level_tag = element.tags.get("admin_level")
-        natural_tag = element.tags.get("natural")
-        water_tag = element.tags.get("water")
-        wetland_tag = element.tags.get("wetland")
-        volcano_status_tag = element.tags.get("volcano:status")
 
-        def emit(writer: osmium.SimpleWriter) -> None:
-            getattr(writer, writer_method)(element)
+def _natural_stage(values: Sequence[str]) -> FilterStage:
+    return FilterStage(
+        (
+            _expr("natural", values, "w"),
+            _expr("natural", values, "r"),
+            _expr("natural", values, "n"),
+        )
+    )
 
-        if highway_tag in ("motorway", "trunk"):
-            emit(self.highway_writer)
-        if highway_tag in ("primary", "secondary"):
-            emit(self.big_road_writer)
-        if highway_tag == "tertiary":
-            emit(self.middle_road_writer)
-        if highway_tag == "residential":
-            emit(self.small_road_writer)
-        if waterway_tag in ("river", "stream") or water_tag == "river":
-            emit(self.stream_writer)
-        if aeroway_tag == "launchpad":
-            emit(self.aerodrome_writer)
-        if landuse_tag in {
-            "commercial",
-            "construction",
-            "industrial",
-            "residential",
-            "retail",
-        }:
-            emit(self.urban_writer)
-        if boundary_tag == "administrative" and admin_level_tag in {"3", "4"}:
-            if natural_tag != "coastline" and admin_level_tag not in {
-                "2",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "10",
-                "11",
-            }:
-                emit(self.stateborder_writer)
-        if (
-            water_tag in {"lake", "reservoir"}
-            or natural_tag == "water"
-            or landuse_tag == "reservoir"
-        ):
-            emit(self.water_writer)
-        if natural_tag == "wetland":
-            emit(self.wetland_writer)
-        if natural_tag == "wetland" and wetland_tag == "swamp":
-            emit(self.swamp_writer)
-        if waterway_tag in {"river", "riverbank", "canal"} or water_tag == "river":
-            emit(self.river_writer)
-        if natural_tag == "glacier":
-            emit(self.glacier_writer)
-        if natural_tag == "volcano" and volcano_status_tag == "active":
-            emit(self.volcano_writer)
-        if natural_tag == "beach":
-            emit(self.beach_writer)
-        if landuse_tag == "forest":
-            emit(self.forest_writer)
-        if landuse_tag == "farmland":
-            emit(self.farmland_writer)
-        if landuse_tag == "vineyard":
-            emit(self.vineyard_writer)
-        if landuse_tag == "meadow":
-            emit(self.meadow_writer)
-        if (
-            landuse_tag in {"grass", "fell", "heath", "scrub"}
-            or natural_tag == "grassland"
-        ):
-            emit(self.grass_writer)
-        if landuse_tag == "quarry":
-            emit(self.quarry_writer)
-        if landuse_tag == "bare_rock" or natural_tag in {"scree", "shingle"}:
-            emit(self.bare_rock_writer)
-        if boundary_tag == "administrative" and admin_level_tag == "2":
-            if natural_tag != "coastline" and admin_level_tag not in {
-                "3",
-                "4",
-                "5",
-                "6",
-                "7",
-                "8",
-                "9",
-                "10",
-                "11",
-            }:
-                emit(self.border_writer)
+
+OSMIUM_LAYER_FILTERS: dict[str, tuple[FilterStage, ...]] = {
+    "highway": (FilterStage((_expr("highway", ("motorway", "trunk"), "w"),)),),
+    "big_road": (FilterStage((_expr("highway", ("primary", "secondary"), "w"),)),),
+    "middle_road": (FilterStage((_expr("highway", ("tertiary",), "w"),)),),
+    "small_road": (FilterStage((_expr("highway", ("residential",), "w"),)),),
+    "stream": (
+        FilterStage(
+            (
+                _expr("waterway", ("river", "stream"), "w"),
+                _expr("waterway", ("river", "stream"), "r"),
+                _expr("water", ("river",), "w"),
+            )
+        ),
+    ),
+    "river": (
+        FilterStage(
+            (
+                _expr("waterway", ("river", "riverbank", "canal"), "w"),
+                _expr("waterway", ("river", "riverbank", "canal"), "r"),
+                _expr("water", ("river",), "w"),
+            )
+        ),
+    ),
+    "aerodrome": (
+        FilterStage(
+            (
+                _expr("aeroway", ("launchpad",), "n"),
+                _expr("aeroway", ("launchpad",), "w"),
+                _expr("aeroway", ("launchpad",), "r"),
+            )
+        ),
+    ),
+    "urban": (
+        _landuse_stage(
+            ("commercial", "construction", "industrial", "residential", "retail")
+        ),
+    ),
+    "stateborder": (
+        FilterStage((_expr("boundary", ("administrative",)),)),
+        FilterStage((_expr("admin_level", ("3", "4")),)),
+    ),
+    "border": (
+        FilterStage((_expr("boundary", ("administrative",)),)),
+        FilterStage((_expr("admin_level", ("2",)),)),
+    ),
+    "water": (
+        FilterStage(
+            (
+                _expr("water", ("lake", "reservoir"), "w"),
+                _expr("water", ("lake", "reservoir"), "r"),
+                _expr("water", ("lake", "reservoir"), "n"),
+                _expr("natural", ("water",), "w"),
+                _expr("natural", ("water",), "r"),
+                _expr("natural", ("water",), "n"),
+                _expr("landuse", ("reservoir",), "w"),
+                _expr("landuse", ("reservoir",), "r"),
+            )
+        ),
+    ),
+    "wetland": (_natural_stage(("wetland",)),),
+    "swamp": (
+        _natural_stage(("wetland",)),
+        FilterStage((_expr("wetland", ("swamp",)),)),
+    ),
+    "glacier": (_natural_stage(("glacier",)),),
+    "volcano": (
+        _natural_stage(("volcano",)),
+        FilterStage((_expr("volcano:status", ("active",)),)),
+    ),
+    "beach": (_natural_stage(("beach",)),),
+    "forest": (_landuse_stage(("forest",)),),
+    "farmland": (_landuse_stage(("farmland",)),),
+    "vineyard": (_landuse_stage(("vineyard",)),),
+    "meadow": (_landuse_stage(("meadow",)),),
+    "grass": (
+        _landuse_stage(("grass", "fell", "heath", "scrub")),
+        _natural_stage(("grassland",)),
+    ),
+    "quarry": (_landuse_stage(("quarry",)),),
+    "bare_rock": (
+        FilterStage(
+            (
+                _expr("landuse", ("bare_rock",), "w"),
+                _expr("landuse", ("bare_rock",), "r"),
+                _expr("natural", ("scree", "shingle"), "w"),
+                _expr("natural", ("scree", "shingle"), "r"),
+            )
+        ),
+    ),
+}
 
 
 def preprocess_osm(config: GeneratorConfig) -> None:
@@ -207,48 +195,170 @@ def preprocess_osm(config: GeneratorConfig) -> None:
     logger.info("Starting OSM preprocessing")
     output_folder = config.osm_data_dir
     output_folder.mkdir(parents=True, exist_ok=True)
+    active_layers = _active_layers(ALL_OSM_FILES, config.osm_switch)
 
-    if not _all_outputs_exist(output_folder, ALL_OSM_FILES, ".osm"):
-        try:
-            OSMPreprocessor(output_folder).apply_file(str(config.pbf_path))
-        except Exception as exc:  # pragma: no cover - depends on binary libs
-            logger.exception("OSM preprocess error")
-            raise RuntimeError("OSM preprocessing failed") from exc
-        logger.info("OSM preprocess completed")
+    if not _all_outputs_exist(output_folder, active_layers, ".osm"):
+        _run_parallel_osmium(config, active_layers)
     else:
         logger.info("OSM preprocess already completed, skipping")
 
-    logger.info("Fixing geometries via QGIS")
-    if not _all_outputs_exist(output_folder, OSM_POSTFIX.keys(), ".shp"):
-        pool = pebble.ProcessPool(
-            max_workers=config.threads,
-            max_tasks=1,
-            context=mp.get_context("forkserver"),
-        )
-        for output_name in OSM_POSTFIX:
-            pool.schedule(_qgis_fix, [config, output_name])
-        pool.close()
-        pool.join()
+    logger.info("Converting layers via ogr2ogr and GeoPandas")
+    shapefile_layers = _active_layers(tuple(OSM_POSTFIX.keys()), config.osm_switch)
+    if not _all_outputs_exist(output_folder, shapefile_layers, ".shp"):
+        _run_parallel_shapefile_fix(config, shapefile_layers)
         logger.info("Geometry fixing completed")
     else:
-        logger.info("All shapefiles exist, skipping QGIS fix")
+        logger.info("All shapefiles exist, skipping ogr2ogr/GeoPandas fix")
 
 
 def _all_outputs_exist(folder: Path, names: Iterable[str], suffix: str) -> bool:
     return all((folder / f"{name}{suffix}").exists() for name in names)
 
 
-def _qgis_fix(config: GeneratorConfig, output_name: str) -> None:
+def _active_layers(layers: Sequence[str], switches: Mapping[str, bool]) -> list[str]:
+    return [layer for layer in layers if switches.get(layer, True)]
+
+
+def _run_parallel_osmium(config: GeneratorConfig, layers: Sequence[str]) -> None:
+    if not layers:
+        logger.info("No OSM layers requested, skipping osmium filters")
+        return
+    max_workers = max(1, min(len(layers), config.threads))
+    logger.info(
+        "Running osmium-tool across %s layers with %s worker(s)",
+        len(layers),
+        max_workers,
+    )
+    context = mp.get_context("forkserver")
+    with pebble.ProcessPool(
+        max_workers=max_workers, context=context, max_tasks=1
+    ) as pool:
+        futures = [
+            pool.schedule(_run_osmium_for_layer, args=[config, layer])
+            for layer in layers
+        ]
+        for future in futures:
+            future.result()
+    logger.info("OSM preprocess completed")
+
+
+def _run_osmium_for_layer(config: GeneratorConfig, layer: str) -> None:
+    stages = OSMIUM_LAYER_FILTERS.get(layer)
+    if not stages:
+        raise KeyError(f"Missing osmium filter definition for layer '{layer}'")
+    target = config.osm_data_dir / f"{layer}.osm"
+    _execute_osmium_pipeline(config.pbf_path, target, stages)
+
+
+def _execute_osmium_pipeline(
+    input_path: Path, output_path: Path, stages: Sequence[FilterStage]
+) -> None:
+    source = input_path
+    temp_files: list[Path] = []
+    try:
+        for idx, stage in enumerate(stages):
+            is_last = idx == len(stages) - 1
+            if not stage.expressions:
+                raise ValueError("Filter stage must contain at least one expression")
+            if is_last:
+                stage_output = output_path
+                fmt = "osm"
+            else:
+                temp_fd, temp_name = tempfile.mkstemp(
+                    suffix=".osm.pbf", prefix="osmium-stage-"
+                )
+                os.close(temp_fd)
+                stage_output = Path(temp_name)
+                temp_files.append(stage_output)
+                fmt = "osm.pbf"
+            _run_osmium_stage(source, stage_output, fmt, stage.expressions)
+            source = stage_output
+    finally:
+        for temp in temp_files:
+            try:
+                temp.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _run_osmium_stage(
+    source: Path, target: Path, fmt: str, expressions: Sequence[str]
+) -> None:
+    cmd = [
+        "osmium",
+        "tags-filter",
+        "--overwrite",
+        "--add-referenced",
+        "-o",
+        str(target),
+        "-f",
+        fmt,
+        str(source),
+        *expressions,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        logger.error(
+            "osmium tags-filter failed for %s: %s", target, result.stderr.strip()
+        )
+        raise RuntimeError(
+            f"osmium tags-filter failed for {target}: {result.stderr.strip()}"
+        )
+    if result.stderr.strip():
+        logger.debug("osmium tags-filter %s", result.stderr.strip())
+
+
+def _run_parallel_shapefile_fix(config: GeneratorConfig, layers: Sequence[str]) -> None:
+    if not layers:
+        logger.info("No shapefile layers requested, skipping ogr2ogr/GeoPandas")
+        return
+    max_workers = max(1, min(len(layers), config.threads))
+    context = mp.get_context("forkserver")
+    with pebble.ProcessPool(
+        max_workers=max_workers, context=context, max_tasks=1
+    ) as pool:
+        futures = [
+            pool.schedule(_ogr2ogr_fix_layer, args=[config, layer]) for layer in layers
+        ]
+        for future in futures:
+            future.result()
+
+
+def _ogr2ogr_fix_layer(config: GeneratorConfig, output_name: str) -> None:
     input_name, postfix = OSM_POSTFIX[output_name]
     input_file = config.osm_data_dir / f"{input_name}.osm"
     output_file = config.osm_data_dir / f"{output_name}.shp"
-    result = fix_geometry(
-        "",
-        "native:fixgeometries",
-        {"INPUT": f"{input_file}{postfix}", "OUTPUT": str(output_file)},
-    )
-    output_location = result.get("OUTPUT") if isinstance(result, Mapping) else None
-    logger.info("QGIS fix geometries %s done: %s", output_name, output_location)
+    if not input_file.exists():
+        logger.warning("Skipping %s because %s is missing", output_name, input_file)
+        return
+    _run_ogr2ogr(input_file, postfix, output_file)
+    _fix_shapefile_geometries(output_file)
+    logger.info("ogr2ogr/GeoPandas fix complete for %s", output_name)
+
+
+def _run_ogr2ogr(input_file: Path, postfix: str, output_file: Path) -> None:
+    target = str(output_file)
+    source = f"{input_file}{postfix}"
+    cmd = ["ogr2ogr", "-overwrite", target, source]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.stdout.strip():
+        logger.debug("ogr2ogr %s", result.stdout.strip())
+    if result.returncode != 0:
+        logger.error("ogr2ogr failed for %s: %s", target, result.stderr.strip())
+        raise RuntimeError(f"ogr2ogr failed for {target}: {result.stderr.strip()}")
+
+
+def _fix_shapefile_geometries(output_file: Path) -> None:
+    gdf = gpd.read_file(output_file)
+    if gdf.empty:
+        return
+    if hasattr(gdf.geometry, "make_valid"):
+        geometries = gdf.geometry.make_valid()
+    else:
+        geometries = gdf.geometry.buffer(0)
+    gdf["geometry"] = geometries
+    gdf = gdf[gdf.geometry.notnull() & ~gdf.geometry.is_empty]
+    gdf.to_file(output_file, driver="ESRI Shapefile")
 
 
 __all__ = ["preprocess_osm"]

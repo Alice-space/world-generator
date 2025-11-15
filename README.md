@@ -117,22 +117,33 @@ Create and activate a virtual environment, then install required Python packages
 python3 -m venv venv
 source venv/bin/activate
 pip install -U pip setuptools wheel
-pip install osmium pebble pyyaml
+pip install geopandas pebble pyyaml shapely
 ```
 
 > Make sure to activate the virtual environment before running Python scripts, or invoke using the full path `venv/bin/python`.
 
-### Step 9: osmium-tool (optional)
+### Step 9: GDAL / ogr2ogr
 
-If you need the `osmium` CLI for processing OSM data (`.osm.pbf`), install it via:
+Install GDAL so that the `ogr2ogr` utility is available for shapefile conversion:
+
+```bash
+sudo apt install -y gdal-bin
+```
+
+### Step 10: osmium-tool (required)
+
+Install the `osmium` CLI; `preprocess.py` shells out to `osmium tags-filter` for
+multi-threaded layer extraction, so this step is mandatory:
 
 ```bash
 sudo apt install -y osmium-tool
 ```
 
-**Note**: This is not the Python package `osmium` (pyosmium), but the separate command-line tool. The project primarily uses pyosmium; osmium-tool is only needed for additional CLI operations.
+**Note**: This is not the Python package `osmium` (pyosmium). We rely on the
+C++ `osmium` command-line tool executed via subprocess; make sure it is on your
+`PATH` before running the generator.
 
-### Step 10: ImageMagick Configuration
+### Step 11: ImageMagick Configuration
 
 Remove restrictive ImageMagick policy:
 
@@ -140,7 +151,7 @@ Remove restrictive ImageMagick policy:
 sudo rm /etc/ImageMagick-6/policy.xml
 ```
 
-### Step 11: Project Setup
+### Step 12: Project Setup
 
 Clone the repository and set up the workspace:
 
@@ -157,7 +168,7 @@ cp config.example.yaml config.yaml
 # Edit config.yaml according to your needs
 ```
 
-### Step 12: Configuration Files Setup
+### Step 13: Configuration Files Setup
 
 Create necessary configuration directories:
 
@@ -256,13 +267,14 @@ follows:
    reads `config.yaml` (or `WORLD_GENERATOR_CONFIG`) into a typed
    `GeneratorConfig`, wires logging, and determines whether to run the full
    pipeline or individual stages.
-2. **OSM preprocessing** (`preprocess.py`): `osmium` streams the planet extract
-   (`pbf_path`) and writes thematic `.osm` files under
-   `osm_folder_path/all/`. The optional `osm_switch` in the config lets you
-   disable specific layers (e.g., aerodromes or rivers).
-3. **Geometry fixing** (`qgiscontroller.fix_geometry`): offloads to QGIS to
-   generate cleaned `.shp` files for land cover layers that WorldPainter relies
-   on.
+2. **OSM preprocessing** (`preprocess.py`): orchestrates multiple `osmium
+   tags-filter` CLI invocations (one per thematic layer) against the planet
+   extract (`pbf_path`) and writes `.osm` files under `osm_folder_path/all/` in
+   parallel. The optional `osm_switch` in the config lets you disable specific
+   layers (e.g., aerodromes or rivers).
+3. **Geometry fixing** (`ogr2ogr` + GeoPandas): converts each `.osm` layer into
+   shapefiles via GDAL and applies `GeoSeries.make_valid()` cleanup so
+   downstream QGIS/WorldPainter steps receive valid geometries.
 4. **QGIS image exports** (`imageexport.py`): copies or symlinks the generated
    OSM files into the QGIS project folder (`tiles.copy_osm_files`), then calls
    QGIS in headless mode to export every selected layer tile-by-tile into
@@ -298,8 +310,8 @@ follows:
 
 | Output | Location | Produced by |
 | --- | --- | --- |
-| Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `OSMPreprocessor.apply_file` |
-| Geometry-fixed shapefiles | `osm_folder_path/all/*.shp` | `qgiscontroller.fix_geometry` |
+| Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `osmium tags-filter` pipeline |
+| Geometry-fixed shapefiles | `osm_folder_path/all/*.shp` | `ogr2ogr` + GeoPandas |
 | Per-tile rasters | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
 | Heightmaps (16-bit) | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
 | ImageMagick intermediates | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick` |
@@ -327,7 +339,7 @@ follows:
 │   └── world_generator/
 │       ├── cli.py                # CLI entry point (`world-generator` console script)
 │       ├── pipeline.py           # High-level orchestrator for stages
-│       ├── preprocess.py         # OSM splitting + QGIS geometry fixes
+│       ├── preprocess.py         # OSM splitting via osmium CLI + GDAL/GeoPandas fixes
 │       ├── tiles.py              # Tile workflow driver (QGIS export → WorldPainter)
 │       ├── imageexport.py        # Headless QGIS rendering helpers
 │       ├── magick.py             # ImageMagick-based raster cleanup
