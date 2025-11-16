@@ -42,34 +42,44 @@ ALL_OSM_FILES = [
     "vineyard",
 ]
 
-OSM_POSTFIX: dict[str, tuple[str, str]] = {
-    "urban": ("urban", "|layername=multipolygons"),
-    "broadleaved": (
-        "forest",
-        '\'|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"broadleaved"\'',
-    ),
-    "needleleaved": (
-        "forest",
-        '\'|layername=multipolygons|subset="other_tags" = \'"leaf_type"=>"needleleaved"\'',
-    ),
-    "mixedforest": ("forest", "|layername=multipolygons"),
-    "beach": ("beach", "|layername=multipolygons"),
-    "grass": ("grass", "|layername=multipolygons"),
-    "farmland": ("farmland", "|layername=multipolygons"),
-    "meadow": ("meadow", "|layername=multipolygons"),
-    "quarry": ("quarry", "|layername=multipolygons"),
-    "water": ("water", '|layername=multipolygons|subset="natural" = "water"'),
-    "glacier": ("glacier", "|layername=multipolygons"),
-    "wetland": ("wetland", "|layername=multipolygons"),
-    "swamp": ("swamp", "|layername=multipolygons"),
-}
-
 
 @dataclass(frozen=True)
 class FilterStage:
     """Represents one `osmium tags-filter` pass."""
 
     expressions: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class OgrLayerSpec:
+    """Parameters describing how to export one OSM layer via ogr2ogr."""
+
+    source_layer: str
+    table: str = "multipolygons"
+    where: str | None = None
+
+
+OGR_LAYER_SPECS: dict[str, OgrLayerSpec] = {
+    "urban": OgrLayerSpec("urban"),
+    "broadleaved": OgrLayerSpec(
+        "forest",
+        where='other_tags LIKE \'%"leaf_type"=>"broadleaved"%\'',
+    ),
+    "needleleaved": OgrLayerSpec(
+        "forest",
+        where='other_tags LIKE \'%"leaf_type"=>"needleleaved"%\'',
+    ),
+    "mixedforest": OgrLayerSpec("forest"),
+    "beach": OgrLayerSpec("beach"),
+    "grass": OgrLayerSpec("grass"),
+    "farmland": OgrLayerSpec("farmland"),
+    "meadow": OgrLayerSpec("meadow"),
+    "quarry": OgrLayerSpec("quarry"),
+    "water": OgrLayerSpec("water", where="\"natural\" = 'water'"),
+    "glacier": OgrLayerSpec("glacier"),
+    "wetland": OgrLayerSpec("wetland"),
+    "swamp": OgrLayerSpec("swamp"),
+}
 
 
 def _expr(key: str, values: Sequence[str], obj_type: str | None = None) -> str:
@@ -204,7 +214,7 @@ def preprocess_osm(config: GeneratorConfig) -> None:
         logger.info("OSM preprocess already completed, skipping")
 
     logger.info("Converting layers via ogr2ogr and GeoPandas")
-    shapefile_layers = _active_layers(tuple(OSM_POSTFIX.keys()), config.osm_switch)
+    shapefile_layers = _active_layers(tuple(OGR_LAYER_SPECS.keys()), config.osm_switch)
     if not _all_outputs_exist(output_folder, shapefile_layers, ".shp"):
         _run_parallel_shapefile_fix(config, shapefile_layers)
         logger.info("Geometry fixing completed")
@@ -329,21 +339,37 @@ def _run_parallel_shapefile_fix(config: GeneratorConfig, layers: Sequence[str]) 
 
 
 def _ogr2ogr_fix_layer(config: GeneratorConfig, output_name: str) -> None:
-    input_name, postfix = OSM_POSTFIX[output_name]
-    input_file = config.osm_data_dir / f"{input_name}.osm"
+    spec = OGR_LAYER_SPECS[output_name]
+    input_file = config.osm_data_dir / f"{spec.source_layer}.osm"
     output_file = config.osm_data_dir / f"{output_name}.shp"
     if not input_file.exists():
         logger.warning("Skipping %s because %s is missing", output_name, input_file)
         return
-    _run_ogr2ogr(input_file, postfix, output_file)
+    _run_ogr2ogr(input_file, output_file, spec)
     _fix_shapefile_geometries(output_file)
     logger.info("ogr2ogr/GeoPandas fix complete for %s", output_name)
 
 
-def _run_ogr2ogr(input_file: Path, postfix: str, output_file: Path) -> None:
+def _build_sql(table: str, where: str | None) -> str:
+    base = f"SELECT * FROM {table}"
+    if where:
+        return f"{base} WHERE {where}"
+    return base
+
+
+def _run_ogr2ogr(input_file: Path, output_file: Path, spec: OgrLayerSpec) -> None:
     target = str(output_file)
-    source = f"{input_file}{postfix}"
-    cmd = ["ogr2ogr", "-overwrite", target, source]
+    sql = _build_sql(spec.table, spec.where)
+    cmd = [
+        "ogr2ogr",
+        "-overwrite",
+        "-f",
+        "ESRI Shapefile",
+        target,
+        str(input_file),
+        "-sql",
+        sql,
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.stdout.strip():
         logger.debug("ogr2ogr %s", result.stdout.strip())
