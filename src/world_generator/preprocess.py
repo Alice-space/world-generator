@@ -197,8 +197,9 @@ def preprocess_osm(config: GeneratorConfig) -> None:
     output_folder.mkdir(parents=True, exist_ok=True)
     active_layers = _active_layers(ALL_OSM_FILES, config.osm_switch)
 
-    if not _all_outputs_exist(output_folder, active_layers, ".osm"):
-        _run_parallel_osmium(config, active_layers)
+    pending_osm_layers = _missing_outputs(output_folder, active_layers, ".osm")
+    if pending_osm_layers:
+        _run_parallel_osmium(config, pending_osm_layers)
     else:
         logger.info("OSM preprocess already completed, skipping")
 
@@ -213,6 +214,10 @@ def preprocess_osm(config: GeneratorConfig) -> None:
 
 def _all_outputs_exist(folder: Path, names: Iterable[str], suffix: str) -> bool:
     return all((folder / f"{name}{suffix}").exists() for name in names)
+
+
+def _missing_outputs(folder: Path, names: Iterable[str], suffix: str) -> list[str]:
+    return [name for name in names if not (folder / f"{name}{suffix}").exists()]
 
 
 def _active_layers(layers: Sequence[str], switches: Mapping[str, bool]) -> list[str]:
