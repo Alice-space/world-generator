@@ -273,8 +273,9 @@ follows:
    parallel. The optional `osm_switch` in the config lets you disable specific
    layers (e.g., aerodromes or rivers).
 3. **Geometry fixing** (`ogr2ogr` + GeoPandas): converts each `.osm` layer into
-   shapefiles via GDAL and applies `GeoSeries.make_valid()` cleanup so
-   downstream QGIS/WorldPainter steps receive valid geometries.
+   vector datasets (GeoPackage by default, or Shapefile if configured) via GDAL
+   and applies `GeoSeries.make_valid()` cleanup so downstream QGIS/WorldPainter
+   steps receive valid geometries.
 4. **QGIS image exports** (`imageexport.py`): copies or symlinks the generated
    OSM files into the QGIS project folder (`tiles.copy_osm_files`), then calls
    QGIS in headless mode to export every selected layer tile-by-tile into
@@ -311,7 +312,7 @@ follows:
 | Output | Location | Produced by |
 | --- | --- | --- |
 | Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `osmium tags-filter` pipeline |
-| Geometry-fixed shapefiles | `osm_folder_path/all/*.shp` | `ogr2ogr` + GeoPandas |
+| Geometry-fixed vector layers (GPKG by default) | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` + GeoPandas |
 | Per-tile rasters | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
 | Heightmaps (16-bit) | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
 | ImageMagick intermediates | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick` |
@@ -358,6 +359,8 @@ follows:
 Edit `config.yaml` to customize (note: `scripts_folder_path` is fixed to `./Data` now):
 
 - `osm_folder_path`: Path to OSM data files
+- `vector_driver`: Choose `GPKG` (default) to avoid the legacy Shapefile 2GB/254-char limits,
+  or switch back to `ESRI Shapefile` if older tooling depends on `.shp` outputs.
 - Processing parameters and output settings
 
 For detailed configuration options, see the example configuration file.

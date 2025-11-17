@@ -11,6 +11,7 @@ from typing import Iterable, Mapping, Sequence
 
 import geopandas as gpd
 import pebble
+from shapely.geometry.base import BaseGeometry
 
 from .config import GeneratorConfig
 
@@ -215,7 +216,9 @@ def preprocess_osm(config: GeneratorConfig) -> None:
 
     logger.info("Converting layers via ogr2ogr and GeoPandas")
     shapefile_layers = _active_layers(tuple(OGR_LAYER_SPECS.keys()), config.osm_switch)
-    if not _all_outputs_exist(output_folder, shapefile_layers, ".shp"):
+    if not _all_outputs_exist(
+        output_folder, shapefile_layers, config.vector_file_suffix
+    ):
         _run_parallel_shapefile_fix(config, shapefile_layers)
         logger.info("Geometry fixing completed")
     else:
@@ -341,12 +344,13 @@ def _run_parallel_shapefile_fix(config: GeneratorConfig, layers: Sequence[str]) 
 def _ogr2ogr_fix_layer(config: GeneratorConfig, output_name: str) -> None:
     spec = OGR_LAYER_SPECS[output_name]
     input_file = config.osm_data_dir / f"{spec.source_layer}.osm"
-    output_file = config.osm_data_dir / f"{output_name}.shp"
+    output_file = config.osm_data_dir / f"{output_name}{config.vector_file_suffix}"
+    layer_name = output_name
     if not input_file.exists():
         logger.warning("Skipping %s because %s is missing", output_name, input_file)
         return
-    _run_ogr2ogr(input_file, output_file, spec)
-    _fix_shapefile_geometries(output_file)
+    _run_ogr2ogr(input_file, output_file, spec, config.vector_driver, layer_name)
+    _fix_vector_layer(output_file, config.vector_driver, layer_name)
     logger.info("ogr2ogr/GeoPandas fix complete for %s", output_name)
 
 
@@ -357,20 +361,30 @@ def _build_sql(table: str, where: str | None) -> str:
     return base
 
 
-def _run_ogr2ogr(input_file: Path, output_file: Path, spec: OgrLayerSpec) -> None:
+def _run_ogr2ogr(
+    input_file: Path,
+    output_file: Path,
+    spec: OgrLayerSpec,
+    driver: str,
+    layer_name: str,
+) -> None:
     target = str(output_file)
     sql = _build_sql(spec.table, spec.where)
     cmd = [
         "ogr2ogr",
         "-overwrite",
         "-f",
-        "ESRI Shapefile",
+        driver,
         target,
         str(input_file),
         "-sql",
         sql,
+        "-nln",
+        layer_name,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    env = os.environ.copy()
+    env.setdefault("OGR_GEOMETRY_ACCEPT_UNCLOSED_RING", "NO")
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.stdout.strip():
         logger.debug("ogr2ogr %s", result.stdout.strip())
     if result.returncode != 0:
@@ -378,8 +392,9 @@ def _run_ogr2ogr(input_file: Path, output_file: Path, spec: OgrLayerSpec) -> Non
         raise RuntimeError(f"ogr2ogr failed for {target}: {result.stderr.strip()}")
 
 
-def _fix_shapefile_geometries(output_file: Path) -> None:
-    gdf = gpd.read_file(output_file)
+def _fix_vector_layer(output_file: Path, driver: str, layer_name: str) -> None:
+    read_kwargs = {"layer": layer_name} if driver != "ESRI Shapefile" else {}
+    gdf = gpd.read_file(output_file, **read_kwargs)
     if gdf.empty:
         return
     if hasattr(gdf.geometry, "make_valid"):
@@ -387,8 +402,67 @@ def _fix_shapefile_geometries(output_file: Path) -> None:
     else:
         geometries = gdf.geometry.buffer(0)
     gdf["geometry"] = geometries
+    target_family = _infer_geometry_family(gdf.geometry)
+    if target_family:
+        gdf = _explode_geometrycollections(gdf, target_family)
     gdf = gdf[gdf.geometry.notnull() & ~gdf.geometry.is_empty]
-    gdf.to_file(output_file, driver="ESRI Shapefile")
+    write_kwargs = {"layer": layer_name} if driver != "ESRI Shapefile" else {}
+    gdf.to_file(output_file, driver=driver, **write_kwargs)
+
+
+def _infer_geometry_family(series: gpd.GeoSeries) -> str | None:
+    for geom in series:
+        if geom is None or geom.is_empty:
+            continue
+        family = _geometry_family(geom)
+        if family:
+            return family
+    return None
+
+
+def _geometry_family(geom: BaseGeometry | None) -> str | None:
+    if geom is None:
+        return None
+    if geom.geom_type in {"LineString", "MultiLineString"}:
+        return "line"
+    if geom.geom_type in {"Polygon", "MultiPolygon"}:
+        return "polygon"
+    if geom.geom_type in {"Point", "MultiPoint"}:
+        return "point"
+    if geom.geom_type == "GeometryCollection":
+        families = {_geometry_family(part) for part in geom.geoms}
+        families.discard(None)
+        return families.pop() if len(families) == 1 else None
+    return None
+
+
+def _flatten_geometry(geom: BaseGeometry | None) -> list[BaseGeometry]:
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "GeometryCollection":
+        flattened: list[BaseGeometry] = []
+        for part in geom.geoms:
+            flattened.extend(_flatten_geometry(part))
+        return flattened
+    return [geom]
+
+
+def _explode_geometrycollections(
+    gdf: gpd.GeoDataFrame, target_family: str
+) -> gpd.GeoDataFrame:
+    rows: list[int] = []
+    new_geoms: list[BaseGeometry] = []
+    for idx, geom in enumerate(gdf.geometry):
+        for part in _flatten_geometry(geom):
+            if target_family == _geometry_family(part):
+                rows.append(idx)
+                new_geoms.append(part)
+    if not rows:
+        return gdf.iloc[0:0]
+    exploded = gdf.iloc[rows].copy()
+    exploded["geometry"] = new_geoms
+    exploded.reset_index(drop=True, inplace=True)
+    return exploded
 
 
 __all__ = ["preprocess_osm"]

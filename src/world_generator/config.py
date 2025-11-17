@@ -11,6 +11,19 @@ CONFIG_ENV_VAR = "WORLD_GENERATOR_CONFIG"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCRIPTS_FOLDER = (PACKAGE_ROOT / "Data").resolve()
 
+SUPPORTED_VECTOR_DRIVERS = {
+    "ESRI Shapefile": ".shp",
+    "GPKG": ".gpkg",
+}
+VECTOR_DRIVER_ALIASES = {
+    "shp": "ESRI Shapefile",
+    "esri shapefile": "ESRI Shapefile",
+    "shapefile": "ESRI Shapefile",
+    "gpkg": "GPKG",
+    "geopackage": "GPKG",
+}
+DEFAULT_VECTOR_DRIVER = "GPKG"
+
 
 def _expand_path(value: str) -> Path:
     """Normalize user provided paths.
@@ -50,10 +63,15 @@ class GeneratorConfig:
     threads: int
     osm_switch: Mapping[str, bool]
     rivers: str
+    vector_driver: str
 
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
+
+    @property
+    def vector_file_suffix(self) -> str:
+        return SUPPORTED_VECTOR_DRIVERS[self.vector_driver]
 
     @property
     def image_exports_dir(self) -> Path:
@@ -75,6 +93,21 @@ def _coerce_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.lower() in {"1", "true", "t", "yes", "y", "on"}
     return bool(value)
+
+
+def _normalize_vector_driver(value: Any) -> str:
+    if value is None:
+        return DEFAULT_VECTOR_DRIVER
+    candidate = str(value).strip()
+    if not candidate:
+        return DEFAULT_VECTOR_DRIVER
+    normalized = VECTOR_DRIVER_ALIASES.get(candidate.lower(), candidate)
+    if normalized not in SUPPORTED_VECTOR_DRIVERS:
+        supported = ", ".join(SUPPORTED_VECTOR_DRIVERS)
+        raise ValueError(
+            f"Unsupported vector driver '{value}'. Choose one of: {supported}"
+        )
+    return normalized
 
 
 def _load_raw_config(config_path: Path) -> MutableMapping[str, Any]:
@@ -115,6 +148,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
     use_high_quality = raw.get("use_high_quality_terrain")
     if use_high_quality is None:
         use_high_quality = raw.get("use_heigh_quality_terrain", False)
+    vector_driver = _normalize_vector_driver(raw.get("vector_driver"))
 
     return GeneratorConfig(
         pbf_path=_expand_path(str(require("pbf_path"))),
@@ -138,6 +172,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         threads=int(require("threads")),
         osm_switch=osm_switch,
         rivers=str(require("rivers")),
+        vector_driver=vector_driver,
     )
 
 

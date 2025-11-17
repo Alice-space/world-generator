@@ -8,6 +8,10 @@ pbf_path: "/workspace/Data/planet-latest.osm.pbf"
 # Absolute or pwd-relative paths are supported.
 osm_folder_path: "/workspace/Data/osm/"
 
+# Vector driver used for cleaned exports. `GPKG` (default) avoids the 2GB Shapefile limit.
+# Set to `ESRI Shapefile` if you explicitly need legacy .shp outputs.
+vector_driver: GPKG
+
 # Primary QGIS project (land/vegetation/roads etc.) consumed by the export stage.
 qgis_project_path: "/workspace/Data/qgis-project/QGIS/MinecraftEarthTiles.qgz"
 
