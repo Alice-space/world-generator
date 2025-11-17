@@ -150,11 +150,17 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         use_high_quality = raw.get("use_heigh_quality_terrain", False)
     vector_driver = _normalize_vector_driver(raw.get("vector_driver"))
 
+    scripts_folder_raw = raw.get("scripts_folder_path")
+    if scripts_folder_raw is None:
+        scripts_folder_path = DEFAULT_SCRIPTS_FOLDER
+    else:
+        scripts_folder_path = _expand_path(str(scripts_folder_raw))
+
     return GeneratorConfig(
         pbf_path=_expand_path(str(require("pbf_path"))),
         osm_folder_path=_expand_path(str(require("osm_folder_path"))),
         qgis_project_path=_expand_path(str(require("qgis_project_path"))),
-        scripts_folder_path=DEFAULT_SCRIPTS_FOLDER,
+        scripts_folder_path=scripts_folder_path,
         qgis_bathymetry_project_path=_expand_path(
             str(require("qgis_bathymetry_project_path"))
         ),

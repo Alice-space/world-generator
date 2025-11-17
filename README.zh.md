@@ -314,7 +314,7 @@ tail -f generator.log
 
 ## 配置说明
 
-编辑 `config.yaml` 进行自定义（`scripts_folder_path` 现已固定为 `./Data`，无需配置）：
+编辑 `config.yaml` 进行自定义（如脚本目录不在 `./Data`，可修改 `scripts_folder_path`）：
 
 - `osm_folder_path`: OSM 数据文件路径
 - `vector_driver`: 选择 `GPKG`（默认，避免 Shapefile 2GB/字段长度限制）或 `ESRI Shapefile`（需要兼容旧 `.shp` 工作流时使用）。

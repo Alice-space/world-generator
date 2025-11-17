@@ -356,7 +356,7 @@ follows:
 
 ## Configuration
 
-Edit `config.yaml` to customize (note: `scripts_folder_path` is fixed to `./Data` now):
+Edit `config.yaml` to customize (set `scripts_folder_path` if your scripts/data live outside `./Data`):
 
 - `osm_folder_path`: Path to OSM data files
 - `vector_driver`: Choose `GPKG` (default) to avoid the legacy Shapefile 2GB/254-char limits,

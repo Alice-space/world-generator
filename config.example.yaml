@@ -1,4 +1,6 @@
-# scripts_folder_path is now fixed to the repository's ./Data directory and no longer configurable.
+# Root directory containing WorldPainter scripts, exports, and final worlds.
+# Defaults to the repository's ./Data directory if omitted.
+scripts_folder_path: "Data"
 
 # === Data Sources ===
 # Path to the planet PBF file; absolute paths or ones relative to `pwd` both work.
