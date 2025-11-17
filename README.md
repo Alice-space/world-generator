@@ -117,7 +117,7 @@ Create and activate a virtual environment, then install required Python packages
 python3 -m venv venv
 source venv/bin/activate
 pip install -U pip setuptools wheel
-pip install geopandas pebble pyyaml shapely
+pip install pebble pyyaml
 ```
 
 > Make sure to activate the virtual environment before running Python scripts, or invoke using the full path `venv/bin/python`.
@@ -272,10 +272,11 @@ follows:
    extract (`pbf_path`) and writes `.osm` files under `osm_folder_path/all/` in
    parallel. The optional `osm_switch` in the config lets you disable specific
    layers (e.g., aerodromes or rivers).
-3. **Geometry fixing** (`ogr2ogr` + GeoPandas): converts each `.osm` layer into
-   vector datasets (GeoPackage by default, or Shapefile if configured) via GDAL
-   and applies `GeoSeries.make_valid()` cleanup so downstream QGIS/WorldPainter
-   steps receive valid geometries.
+3. **Geometry fixing** (`ogr2ogr` with GDAL): converts each `.osm` layer into
+   vector datasets (GeoPackage by default, or Shapefile if configured) and
+   applies `-makevalid` + `-explodecollections` inside GDAL so downstream
+   QGIS/WorldPainter steps receive valid geometries without any Python
+   GeoPandas step.
 4. **QGIS image exports** (`imageexport.py`): copies or symlinks the generated
    OSM files into the QGIS project folder (`tiles.copy_osm_files`), then calls
    QGIS in headless mode to export every selected layer tile-by-tile into
@@ -312,7 +313,7 @@ follows:
 | Output | Location | Produced by |
 | --- | --- | --- |
 | Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `osmium tags-filter` pipeline |
-| Geometry-fixed vector layers (GPKG by default) | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` + GeoPandas |
+| Geometry-fixed vector layers (GPKG by default) | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` |
 | Per-tile rasters | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
 | Heightmaps (16-bit) | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
 | ImageMagick intermediates | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick` |
@@ -340,7 +341,7 @@ follows:
 │   └── world_generator/
 │       ├── cli.py                # CLI entry point (`world-generator` console script)
 │       ├── pipeline.py           # High-level orchestrator for stages
-│       ├── preprocess.py         # OSM splitting via osmium CLI + GDAL/GeoPandas fixes
+│       ├── preprocess.py         # OSM splitting via osmium CLI + GDAL/ogr2ogr fixes
 │       ├── tiles.py              # Tile workflow driver (QGIS export → WorldPainter)
 │       ├── imageexport.py        # Headless QGIS rendering helpers
 │       ├── magick.py             # ImageMagick-based raster cleanup

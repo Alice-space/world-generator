@@ -5,14 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "world-generator"
 version = "0.0.1"
-description = "Minecraft world generator in parallel"
+description = "Minecraft world generator with OSM preprocessing via osmium + GDAL/ogr2ogr"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "PyYAML>=6.0",
-    "geopandas>=0.14",
     "pebble",
-    "shapely>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -43,5 +41,5 @@ disallow_untyped_defs = true
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["PyQt5.*", "geopandas.*", "qgis.*", "processing.*"]
+module = ["PyQt5.*", "qgis.*", "processing.*"]
 ignore_missing_imports = true

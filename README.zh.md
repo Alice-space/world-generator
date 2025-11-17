@@ -118,7 +118,7 @@ rm /tmp/Minutor.Ubuntu-22.04.zip
 python3 -m venv venv
 source venv/bin/activate
 pip install -U pip setuptools wheel
-pip install geopandas pebble pyyaml shapely
+pip install pebble pyyaml
 ```
 
 > 在后续步骤中如需运行 Python 脚本，请确保虚拟环境已激活。或使用 `venv/bin/python` 完整路径调用。
@@ -246,7 +246,7 @@ tail -f generator.log
 2. **OSM 预处理**（`preprocess.py`）：调度多个 `osmium tags-filter` CLI
    命令（每个图层一个）并行读取 `pbf_path`，输出到
    `osm_folder_path/all/*.osm`，`osm_switch` 可在配置里禁用特定图层。
-3. **几何修复**（`ogr2ogr` + GeoPandas）：借助 GDAL 将 `.osm` 图层转换为矢量数据集（默认 GeoPackage，可按需改为 Shapefile），并使用 `GeoSeries.make_valid()` 清理几何，确保 QGIS/WorldPainter 可稳定读取。
+3. **几何修复**（`ogr2ogr`）：在 GDAL 内部使用 `-makevalid` 与 `-explodecollections` 将 `.osm` 图层转换为矢量数据集（默认 GeoPackage，可按需改为 Shapefile），无需 GeoPandas 也能保证几何有效。
 4. **QGIS 影像导出**（`imageexport.py` 与 `tiles.copy_osm_files`）：将生成的 OSM 文件软链/复制到 QGIS 工程目录，然后在无头模式下为所有选定图层逐瓦片导出到 `scripts_folder_path/image_exports/<TILE>/`。
 5. **高度图重采样**：仍在 `imageexport.py` 内，`gdal_translate` 将 `HQheightmap.tif` 切片为 16bit PNG，输出到各瓦片的 `heightmap/` 目录，分辨率由 `blocks_per_tile` 决定。
 6. **图像后处理**（`magick.py`）：调用 ImageMagick 统一调色板、生成水体掩膜、填补空洞，并生成匹配 WorldPainter 模板的 `*_terrain_reduced_colors.png` 等资源。
@@ -270,7 +270,7 @@ tail -f generator.log
 | 输出 | 位置 | 由谁生成 |
 | --- | --- | --- |
 | 按主题拆分的 `.osm` | `osm_folder_path/all/*.osm` | `osmium tags-filter` 流程 |
-| 修复后的矢量文件（默认 `.gpkg`） | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` + GeoPandas |
+| 修复后的矢量文件（默认 `.gpkg`） | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` |
 | 每瓦片的图层栅格 | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
 | 16bit 高程图 | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `imageexport.py` 中的 `gdal_translate` 步骤 |
 | ImageMagick 中间件 | 同瓦片目录（如 `*_terrain_reduced_colors.png`） | `magick.run_magick` |
@@ -298,7 +298,7 @@ tail -f generator.log
 │   └── world_generator/
 │       ├── cli.py                # CLI 入口（`world-generator` 指令）
 │       ├── pipeline.py           # 流水线调度
-│       ├── preprocess.py         # 调用 osmium CLI 进行 OSM 拆分 + GDAL/GeoPandas 几何修复
+│       ├── preprocess.py         # 调用 osmium CLI 进行 OSM 拆分 + GDAL/ogr2ogr 几何修复
 │       ├── tiles.py              # 瓦片工作流驱动（QGIS → WorldPainter）
 │       ├── imageexport.py        # QGIS 影像导出工具
 │       ├── magick.py             # ImageMagick 栅格处理
