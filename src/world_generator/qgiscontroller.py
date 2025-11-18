@@ -14,10 +14,19 @@ from .tools import calculateTiles
 logger = logging.getLogger(__name__)
 
 _QGIS_PLUGIN_PATH = "/usr/share/qgis/python/plugins"
+# Debian/Ubuntu ship QGIS + PyQt5 into the system dist-packages dir.
+# When the generator runs inside a virtualenv (the default in this repo)
+# those packages are hidden from sys.path, which causes headless exports
+# to fail with ModuleNotFoundError before any logging is emitted.  We add
+# the dist-packages path explicitly so subprocesses spawned from the venv
+# can see the system QGIS/PyQt5 modules.
+_SYSTEM_DIST_PACKAGES = "/usr/lib/python3/dist-packages"
 
 
 def _inject_qgis_plugins() -> None:
-    """Add the QGIS plugin directory to ``sys.path`` if it is missing."""
+    """Ensure QGIS/PyQt system paths are visible inside venv workers."""
+    if _SYSTEM_DIST_PACKAGES not in sys.path:
+        sys.path.append(_SYSTEM_DIST_PACKAGES)
     if _QGIS_PLUGIN_PATH not in sys.path:
         sys.path.append(_QGIS_PLUGIN_PATH)
 

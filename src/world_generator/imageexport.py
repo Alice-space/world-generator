@@ -3,6 +3,7 @@
 import logging
 import multiprocessing as mp
 import subprocess
+from logging import FileHandler, StreamHandler
 from pathlib import Path
 
 import pebble
@@ -109,6 +110,41 @@ def _terrain_layer_names(config: GeneratorConfig) -> dict[str, tuple[str, ...]]:
     return layers
 
 
+# -- Logging helpers ---------------------------------------------------------
+
+_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+
+
+def _gather_logging_targets() -> tuple[list[Path], bool, int]:
+    """Collect log destinations from the parent process.
+
+    We cannot share handler instances across processes (they are not picklable),
+    so we record their parameters and recreate them inside worker processes.
+    """
+    files: list[Path] = []
+    mirror_console = False
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, FileHandler):
+            files.append(Path(handler.baseFilename))
+        elif isinstance(handler, StreamHandler):
+            mirror_console = True
+    return files, mirror_console, root.level or logging.INFO
+
+
+def _init_worker_logging(
+    log_files: list[Path], mirror_console: bool, level: int
+) -> None:
+    """Configure logging inside worker processes to mirror the parent."""
+    handlers: list[logging.Handler] = []
+    for path in log_files:
+        # Each worker opens its own handle to avoid cross-process contention issues.
+        handlers.append(FileHandler(path))
+    if mirror_console:
+        handlers.append(StreamHandler())
+    logging.basicConfig(level=level, format=_LOG_FORMAT, handlers=handlers or None)
+
+
 def _schedule_layer_exports(
     config: GeneratorConfig,
     project_path: Path,
@@ -118,11 +154,14 @@ def _schedule_layer_exports(
     x_min_list: list[int],
     x_max_list: list[int],
 ) -> None:
+    log_files, mirror_console, log_level = _gather_logging_targets()
     for name, layers in layer_map.items():
         pool = pebble.ProcessPool(
             max_workers=config.threads,
             max_tasks=1,
             context=mp.get_context("forkserver"),
+            initializer=_init_worker_logging,
+            initargs=[log_files, mirror_console, log_level],
         )
         for idx in range(config.threads):
             pool.schedule(
@@ -203,10 +242,13 @@ def image_export(config: GeneratorConfig) -> None:
     )
 
     logger.info("Image export completed, running gdal_translate")
+    log_files, mirror_console, log_level = _gather_logging_targets()
     pool = pebble.ProcessPool(
         max_workers=config.threads,
         max_tasks=1,
         context=mp.get_context("forkserver"),
+        initializer=_init_worker_logging,
+        initargs=[log_files, mirror_console, log_level],
     )
     for x_min in range(-180, 180, degree_per_tile):
         for y_min in range(-90, 90, degree_per_tile):
