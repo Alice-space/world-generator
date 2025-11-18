@@ -9,6 +9,7 @@ import sys
 from .config import GeneratorConfig
 from .imageexport import image_export
 from .magick import magick_convert
+from .preprocess import OGR_LAYER_SPECS
 from .wpscript import wp_generate
 
 logger = logging.getLogger(__name__)
@@ -21,18 +22,32 @@ def copy_osm_files(config: GeneratorConfig) -> None:
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     empty_osm = config.qgis_project_path.parent / "empty.osm"
+    empty_gpkg = config.qgis_project_path.parent / "empty.gpkg"
+    if not empty_gpkg.exists():
+        empty_gpkg.touch()
 
-    files_by_stem = {f.stem: f for f in src_dir.iterdir() if f.is_file()}
+    # 1) Always link GPKG exports. If a layer GPKG is missing, link to an empty placeholder.
+    gpkg_files = {p.stem: p for p in src_dir.glob("*.gpkg")}
+    gpkg_layer_names = set(OGR_LAYER_SPECS.keys()) | set(gpkg_files.keys())
+    for name in gpkg_layer_names:
+        source = gpkg_files.get(name, empty_gpkg)
+        dest_file = dest_dir / f"{name}.gpkg"
+        if dest_file.exists() or dest_file.is_symlink():
+            dest_file.unlink()
+        os.symlink(source, dest_file)
 
-    # Ensure we also process layers that are only present in the config
-    # (e.g., disabled layers without a source file).
-    layer_names = set(files_by_stem) | set(config.osm_switch.keys())
+    # 2) Link OSM layers according to config, falling back to empty.osm when disabled.
+    osm_files = {p.stem: p for p in src_dir.glob("*.osm")}
+
+    # Include layers that exist on disk and any explicitly mentioned in the config,
+    # so disabled-but-missing layers still get an empty.osm placeholder.
+    layer_names = set(osm_files) | set(config.osm_switch.keys())
 
     for name in layer_names:
-        file_path = files_by_stem.get(name)
-        dest_file = dest_dir / (file_path.name if file_path else f"{name}.osm")
-
+        dest_file = dest_dir / f"{name}.osm"
         active = config.osm_switch.get(name, True)
+        file_path = osm_files.get(name)
+
         if active:
             if not file_path:
                 logger.warning(
@@ -47,9 +62,6 @@ def copy_osm_files(config: GeneratorConfig) -> None:
         else:
             source = empty_osm
 
-        # Always ensure the destination points to the desired source.
-        # This lets us swap to empty.osm when a layer is disabled in the config,
-        # even if a previous run left a real file/symlink in place.
         if dest_file.exists() or dest_file.is_symlink():
             dest_file.unlink()
         os.symlink(source, dest_file)
@@ -96,10 +108,10 @@ def post_process_map(config: GeneratorConfig) -> None:
 
 def generate_tiles(config: GeneratorConfig) -> None:
     copy_osm_files(config)
-    # image_export(config)
-    # magick_convert(config)
-    # wp_generate(config)
-    # post_process_map(config)
+    image_export(config)
+    magick_convert(config)
+    wp_generate(config)
+    post_process_map(config)
 
 
 __all__ = ["generate_tiles", "copy_osm_files", "post_process_map"]
