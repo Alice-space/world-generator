@@ -22,18 +22,36 @@ def copy_osm_files(config: GeneratorConfig) -> None:
 
     empty_osm = config.qgis_project_path.parent / "empty.osm"
 
-    for file_path in src_dir.iterdir():
-        if not file_path.is_file():
-            continue
-        name = file_path.stem
-        dest_file = dest_dir / file_path.name
+    files_by_stem = {f.stem: f for f in src_dir.iterdir() if f.is_file()}
+
+    # Ensure we also process layers that are only present in the config
+    # (e.g., disabled layers without a source file).
+    layer_names = set(files_by_stem) | set(config.osm_switch.keys())
+
+    for name in layer_names:
+        file_path = files_by_stem.get(name)
+        dest_file = dest_dir / (file_path.name if file_path else f"{name}.osm")
 
         active = config.osm_switch.get(name, True)
-        source = file_path if active else empty_osm
+        if active:
+            if not file_path:
+                logger.warning(
+                    "OSM layer %s is enabled but missing in %s; skipping link",
+                    name,
+                    src_dir,
+                )
+                if dest_file.exists() or dest_file.is_symlink():
+                    dest_file.unlink()
+                continue
+            source = file_path
+        else:
+            source = empty_osm
 
-        if dest_file.exists():
-            logger.info("Skipping %s as it already exists", file_path.name)
-            continue
+        # Always ensure the destination points to the desired source.
+        # This lets us swap to empty.osm when a layer is disabled in the config,
+        # even if a previous run left a real file/symlink in place.
+        if dest_file.exists() or dest_file.is_symlink():
+            dest_file.unlink()
         os.symlink(source, dest_file)
     logger.info("OSM file linking complete")
 
@@ -78,10 +96,10 @@ def post_process_map(config: GeneratorConfig) -> None:
 
 def generate_tiles(config: GeneratorConfig) -> None:
     copy_osm_files(config)
-    image_export(config)
-    magick_convert(config)
-    wp_generate(config)
-    post_process_map(config)
+    # image_export(config)
+    # magick_convert(config)
+    # wp_generate(config)
+    # post_process_map(config)
 
 
 __all__ = ["generate_tiles", "copy_osm_files", "post_process_map"]
