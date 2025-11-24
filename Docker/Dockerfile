@@ -1,8 +1,71 @@
-FROM ubuntu:24.04
-
 ARG WORLDPAINTER_VERSION=2.26.1
 ARG INSTALL_MINUTOR=true
+ARG MINUTOR_VERSION=2.21.0
 ARG ENABLE_TUNA_MIRROR=false
+
+FROM ubuntu:24.04 AS minutor-builder
+
+ARG INSTALL_MINUTOR
+ARG MINUTOR_VERSION
+ARG ENABLE_TUNA_MIRROR
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN if [ "${ENABLE_TUNA_MIRROR}" = "true" ]; then \
+        printf '%s\n' \
+            "Types: deb" \
+            "URIs: http://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports" \
+            "Suites: noble noble-updates noble-backports" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+            "" \
+            "Types: deb" \
+            "URIs: http://ports.ubuntu.com/ubuntu-ports/" \
+            "Suites: noble-security" \
+            "Components: main restricted universe multiverse" \
+            "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg" \
+        > /etc/apt/sources.list.d/ubuntu.sources; \
+    fi
+
+RUN mkdir -p /opt/minutor-dist
+
+RUN if [ "${INSTALL_MINUTOR}" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            build-essential \
+            git \
+            qt5-qmake \
+            qtchooser \
+            qtbase5-dev \
+            qtbase5-dev-tools \
+            qttools5-dev \
+            qttools5-dev-tools \
+            libqt5opengl5-dev \
+            libqt5svg5-dev \
+            pkg-config \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+RUN if [ "${INSTALL_MINUTOR}" = "true" ]; then \
+        git clone --depth 1 --branch "${MINUTOR_VERSION}" https://github.com/mrkite/minutor.git /src/minutor; \
+        pushd /src/minutor; \
+        /usr/lib/qt5/bin/qmake minutor.pro; \
+        make -j"$(nproc)"; \
+        INSTALL_ROOT=/opt/minutor-dist make install; \
+        popd; \
+        rm -rf /src/minutor; \
+    fi
+
+FROM ubuntu:24.04
+
+ARG WORLDPAINTER_VERSION
+ARG INSTALL_MINUTOR
+ARG MINUTOR_VERSION
+ARG ENABLE_TUNA_MIRROR
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8
@@ -44,6 +107,7 @@ RUN apt-get update \
         libssl-dev \
         libtiff-dev \
         libboost-dev \
+        osmium-tool \
         openjdk-21-jdk \
         python3-dev \
         python3-pip \
@@ -78,20 +142,19 @@ RUN mkdir -p /etc/apt/keyrings \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# WorldPainter and optional Minutor
+# WorldPainter
 RUN wget -O /tmp/worldpainter_${WORLDPAINTER_VERSION}.deb https://www.worldpainter.net/files/worldpainter_${WORLDPAINTER_VERSION}.deb \
     && dpkg -i /tmp/worldpainter_${WORLDPAINTER_VERSION}.deb \
     && rm /tmp/worldpainter_${WORLDPAINTER_VERSION}.deb \
     && mkdir -p /root/.local/share/worldpainter/ \
-    && sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions \
-    && if [ "${INSTALL_MINUTOR}" = "true" ]; then \
-        tmpdir=$(mktemp -d); \
-        wget -O "${tmpdir}/Minutor.Ubuntu-22.04.zip" https://github.com/mrkite/minutor/releases/download/2.20.0/Minutor.Ubuntu-22.04.zip; \
-        unzip "${tmpdir}/Minutor.Ubuntu-22.04.zip" -d "${tmpdir}"; \
-        chmod +x "${tmpdir}/minutor"; \
-        mv "${tmpdir}/minutor" /usr/local/bin/minutor; \
-        rm -rf "${tmpdir}"; \
-    fi
+    && sed -i 's/# -Xmx512m/-Xmx6G/g' /opt/worldpainter/wpscript.vmoptions
+
+COPY --from=minutor-builder /opt/minutor-dist /opt/minutor-dist
+
+RUN if [ "${INSTALL_MINUTOR}" = "true" ]; then \
+        cp -a /opt/minutor-dist/. /; \
+    fi \
+    && rm -rf /opt/minutor-dist
 
 COPY requirements.txt /tmp/requirements.txt
 
@@ -106,6 +169,9 @@ RUN mkdir -p /workspace
 # COPY config /root/.local/share/worldpainter/config
 
 WORKDIR /workspace
+
+# Remove ImageMagick security policies that block certain operations
+RUN rm -f /etc/ImageMagick-6/policy.xml /etc/ImageMagick-7/policy.xml /etc/ImageMagick/policy.xml
 
 # start interactive shell by default
 CMD ["/bin/bash"]
