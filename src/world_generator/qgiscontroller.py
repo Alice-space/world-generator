@@ -4,6 +4,8 @@ This module keeps the heavy imports isolated so the rest of the codebase remains
 importable even on machines without QGIS installed."""
 
 import logging
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -23,6 +25,19 @@ _QGIS_PLUGIN_PATH = "/usr/share/qgis/python/plugins"
 _SYSTEM_DIST_PACKAGES = "/usr/lib/python3/dist-packages"
 
 
+def _ensure_headless_env() -> None:
+    """Force Qt to run without touching a windowing system."""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp/qgis-runtime")
+    os.environ["XDG_RUNTIME_DIR"] = runtime_dir
+    try:
+        Path(runtime_dir).mkdir(parents=True, exist_ok=True)
+        os.chmod(runtime_dir, 0o700)
+    except Exception:
+        # Best-effort; Qt will fallback if permissions are off.
+        pass
+
+
 def _inject_qgis_plugins() -> None:
     """Ensure QGIS/PyQt system paths are visible inside venv workers."""
     if _SYSTEM_DIST_PACKAGES not in sys.path:
@@ -33,6 +48,7 @@ def _inject_qgis_plugins() -> None:
 
 def _create_qgs_application() -> Any:  # pragma: no cover - depends on QGIS runtime
     """Create and initialize a headless ``QgsApplication`` instance."""
+    _ensure_headless_env()
     from qgis.core import QgsApplication  # type: ignore
 
     QgsApplication.setPrefixPath("/usr", True)
@@ -47,6 +63,7 @@ def fix_geometry(
     project_path: str, algorithm: str, parameters: Mapping[str, Any]
 ) -> Mapping[str, Any]:
     """Run a QGIS processing algorithm (usually "Fix geometries") and return the outputs."""
+    _ensure_headless_env()
     _inject_qgis_plugins()
     from processing.core.Processing import Processing  # type: ignore
     from qgis import processing  # type: ignore
@@ -88,88 +105,45 @@ def export_image(
     layers: Iterable[str],
 ) -> None:
     """Export the requested layers from a QGIS project into tiled PNG images."""
+    _ensure_headless_env()
     _inject_qgis_plugins()
-    from PyQt5.QtCore import QSize  # type: ignore
-    from qgis.core import (  # type: ignore
-        QgsApplication,
-        QgsLayoutExporter,
-        QgsLayoutItemMap,
-        QgsLayoutPoint,
-        QgsLayoutRenderContext,
-        QgsLayoutSize,
-        QgsPrintLayout,
-        QgsProject,
-        QgsRectangle,
-        QgsUnitTypes,
-    )
+    from processing.core.Processing import Processing  # type: ignore
+    from qgis import processing  # type: ignore
+    from qgis.core import QgsProject  # type: ignore
 
     qgs = None
     project_ref = None
     try:  # pragma: no cover - depends on QGIS runtime
         qgs = _create_qgs_application()
+        Processing.initialize()
+
         project = QgsProject.instance()
         project_ref = project
         project.read(project_path)
         logger.info("QGIS loaded project %s", project.fileName())
 
-        def uncheck_all_layers() -> None:
-            """Hide every layer so we can re-enable only the requested ones."""
-            root = project.layerTreeRoot()
-            for layer in project.mapLayers().values():
-                node = root.findLayer(layer.id())
-                node.setItemVisibilityChecked(False)
-
-        def select_layers() -> None:
-            """Turn on layers whose names start with any of the requested prefixes."""
-            root = project.layerTreeRoot()
-            for layer in project.mapLayers().values():
-                for layer_name in layers:
-                    if layer.name().startswith(layer_name):
-                        node = root.findLayer(layer.id())
-                        node.setItemVisibilityChecked(True)
-
-        def export_single_tile(
-            output_name: Path, x_min: float, x_max: float, y_min: float, y_max: float
-        ) -> None:
-            """Render one map tile covering the provided extent and write it to disk."""
-            layout = QgsPrintLayout(project)
-            layout.initializeDefaults()
-
-            pages = layout.pageCollection()
-            pages.page(0).setPageSize(
-                QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels)
+        layer_order = project.layerTreeRoot().layerOrder()
+        requested_layers = [
+            layer
+            for layer in project.mapLayers().values()
+            if any(layer.name().startswith(prefix) for prefix in layers)
+        ]
+        if not requested_layers:
+            logger.warning(
+                "No layers matched prefixes %s in project %s", layers, project_path
             )
+            return
 
-            item_map = QgsLayoutItemMap(layout)
-            item_map.setRect(0, 0, block_per_tile, block_per_tile)
-            item_map.setExtent(QgsRectangle(x_min, y_min, x_max, y_max))
-            item_map.attemptMove(QgsLayoutPoint(0, 0, QgsUnitTypes.LayoutPixels))
-            item_map.attemptResize(
-                QgsLayoutSize(block_per_tile, block_per_tile, QgsUnitTypes.LayoutPixels)
-            )
-            layout.addLayoutItem(item_map)
+        # Preserve project drawing order to match on-canvas appearance.
+        requested_layers.sort(
+            key=lambda lyr: layer_order.index(lyr.id())
+            if lyr.id() in layer_order
+            else len(layer_order)
+        )
 
-            exporter = QgsLayoutExporter(layout)
-            settings = QgsLayoutExporter.ImageExportSettings()
-            settings.imageSize = QSize(block_per_tile, block_per_tile)
-
-            context = QgsLayoutRenderContext(layout)
-            context.setFlag(context.FlagAntialiasing, False)
-            settings.flags = context.flags()
-
-            result = exporter.exportToImage(str(output_name), settings)
-            if result != QgsLayoutExporter.Success:
-                logger.error(
-                    "exportToImage failed for %s: %s", output_name.name, result
-                )
-            else:
-                logger.info("Generated %s", output_name.name)
-
-            layout.removeLayoutItem(item_map)
-
-        uncheck_all_layers()
-        select_layers()
         image_output_folder = config.image_exports_dir
+        map_units_per_pixel = degree_per_tile / block_per_tile
+
         for x_min in range(x_range_min, x_range_max, degree_per_tile):
             for y_min in range(y_range_min, y_range_max, degree_per_tile):
                 x_max = x_min + degree_per_tile
@@ -177,15 +151,56 @@ def export_image(
                 tile = calculateTiles(x_min, y_max)
                 output_folder = image_output_folder / tile
                 output_folder.mkdir(parents=True, exist_ok=True)
-                if not layer_output_name:
-                    output_name = output_folder / f"{tile}.png"
-                else:
-                    output_name = output_folder / f"{tile}_{layer_output_name}.png"
-                if output_name.exists():
-                    logger.info("Skipping %s", output_name.name)
+                png_name = (
+                    output_folder / f"{tile}.png"
+                    if not layer_output_name
+                    else output_folder / f"{tile}_{layer_output_name}.png"
+                )
+                if png_name.exists():
+                    logger.info("Skipping %s", png_name.name)
                     continue
-                export_single_tile(output_name, x_min, x_max, y_min, y_max)
-        uncheck_all_layers()
+
+                tif_name = png_name.with_suffix(".tif")
+                params = {
+                    "EXTENT": f"{x_min},{x_max},{y_min},{y_max}",
+                    "EXTENT_BUFFER": 0,
+                    "TILE_SIZE": block_per_tile,
+                    "MAP_UNITS_PER_PIXEL": map_units_per_pixel,
+                    "MAKE_BACKGROUND_TRANSPARENT": True,
+                    "LAYERS": requested_layers,
+                    "OUTPUT": str(tif_name),
+                }
+
+                try:
+                    result = processing.run("native:rasterize", params)
+                    output_tif = Path(result.get("OUTPUT", tif_name))
+                except Exception as run_exc:
+                    logger.error(
+                        "native:rasterize failed for %s: %s", tile, run_exc
+                    )
+                    continue
+
+                translate = subprocess.run(
+                    [
+                        "gdal_translate",
+                        "-of",
+                        "PNG",
+                        str(output_tif),
+                        str(png_name),
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if translate.returncode != 0:
+                    logger.error(
+                        "gdal_translate failed for %s: %s", tile, translate.stderr.strip()
+                    )
+                else:
+                    logger.info("Generated %s", png_name.name)
+                try:
+                    output_tif.unlink(missing_ok=True)
+                except Exception:
+                    logger.debug("Could not delete temp file %s", output_tif)
     except Exception as exc:
         logger.error("QGIS export failed for %s: %s", project_path, exc)
     finally:

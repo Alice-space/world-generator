@@ -172,3 +172,5 @@ Data/qgis-bathymetry
 Data/qgis-terrain
 Data/qgis-heightmap
 Data**
+
+.DS_Store
