@@ -257,28 +257,28 @@ tail -f generator.log
 
 ### 关键输入
 
-| 输入 | 配置方式 | 说明 |
-| --- | --- | --- |
-| `config.yaml` | 复制 `config.example.yaml` 并填写绝对路径 | 定义所有依赖位置以及数值参数（`blocks_per_tile`、`degree_per_tile`、`threads` 等）。 |
-| OpenStreetMap PBF (`pbf_path`) | 自行从 Geofabrik/planet 下载 | 原始地理数据，供预处理拆分。 |
-| QGIS 工程 (`qgis_project_path`、`qgis_bathymetry_project_path`、`qgis_terrain_project_path`、`qgis_heightmap_project_path`) | `Data/qgis-*` 目录 | 包含样式与布局设置，为各类图层导出提供模板。 |
-| WorldPainter 脚本集 (`scripts_folder_path/wpscript`、`wpscript.js`、`voidscript.js`、`worldpainter-script.zip`) | 参考 Minecraft Earth Map 指南下载 | `wpscript` 自动化运行所需的脚本与素材，目录结构需保持完整。 |
-| 可选图层开关 (`osm_switch`、`rivers`) | `config.yaml` | 控制哪些 OSM 图层要输出，以及 QGIS 工程引用的河流图层名称。 |
+| 输入                                                                                                                        | 配置方式                                  | 说明                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `config.yaml`                                                                                                               | 复制 `config.example.yaml` 并填写绝对路径 | 定义所有依赖位置以及数值参数（`blocks_per_tile`、`degree_per_tile`、`threads` 等）。 |
+| OpenStreetMap PBF (`pbf_path`)                                                                                              | 自行从 Geofabrik/planet 下载              | 原始地理数据，供预处理拆分。                                                         |
+| QGIS 工程 (`qgis_project_path`、`qgis_bathymetry_project_path`、`qgis_terrain_project_path`、`qgis_heightmap_project_path`) | `Data/qgis-*` 目录                        | 包含样式与布局设置，为各类图层导出提供模板。                                         |
+| WorldPainter 脚本集 (`scripts_folder_path/wpscript`、`wpscript.js`、`voidscript.js`、`worldpainter-script.zip`)             | 参考 Minecraft Earth Map 指南下载         | `wpscript` 自动化运行所需的脚本与素材，目录结构需保持完整。                          |
+| 可选图层开关 (`osm_switch`、`rivers`)                                                                                       | `config.yaml`                             | 控制哪些 OSM 图层要输出，以及 QGIS 工程引用的河流图层名称。                          |
 
 ### 生成产物
 
-| 输出 | 位置 | 由谁生成 |
-| --- | --- | --- |
-| 按主题拆分的 `.osm` | `osm_folder_path/all/*.osm` | `osmium tags-filter` 流程 |
-| 修复后的矢量文件（默认 `.gpkg`） | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` |
-| 每瓦片的图层栅格 | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
-| 16bit 高程图 | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `imageexport.py` 中的 `gdal_translate` 步骤 |
-| ImageMagick 中间件 | 同瓦片目录（如 `*_terrain_reduced_colors.png`） | `magick.run_magick` |
-| WorldPainter `.world` 文件 | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world` | `wpscript.py` |
-| 瓦片导出文件 | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca` | WorldPainter + Minutor 自动化 |
-| 最终 Minecraft 世界 | `scripts_folder_path/<world_name>/region/*.mca` | `tiles.post_process_map` |
-| 总览渲染图 | `scripts_folder_path/<world_name>.png` | 最后一次 Minutor 调用 |
-| 日志 | `generator.log`（或 `--log-file` 指定） | CLI 日志配置 |
+| 输出                             | 位置                                                            | 由谁生成                                    |
+| -------------------------------- | --------------------------------------------------------------- | ------------------------------------------- |
+| 按主题拆分的 `.osm`              | `osm_folder_path/all/*.osm`                                     | `osmium tags-filter` 流程                   |
+| 修复后的矢量文件（默认 `.gpkg`） | `osm_folder_path/all/*.(gpkg                                    | shp)`                                       | `ogr2ogr` |
+| 每瓦片的图层栅格                 | `scripts_folder_path/image_exports/<TILE>/*`                    | `imageexport.export_image`                  |
+| 16bit 高程图                     | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `imageexport.py` 中的 `gdal_translate` 步骤 |
+| ImageMagick 中间件               | 同瓦片目录（如 `*_terrain_reduced_colors.png`）                 | `magick.run_magick`                         |
+| WorldPainter `.world` 文件       | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world`  | `wpscript.py`                               |
+| 瓦片导出文件                     | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca`      | WorldPainter + Minutor 自动化               |
+| 最终 Minecraft 世界              | `scripts_folder_path/<world_name>/region/*.mca`                 | `tiles.post_process_map`                    |
+| 总览渲染图                       | `scripts_folder_path/<world_name>.png`                          | 最后一次 Minutor 调用                       |
+| 日志                             | `generator.log`（或 `--log-file` 指定）                         | CLI 日志配置                                |
 
 ## 项目结构
 
@@ -330,3 +330,20 @@ tail -f generator.log
 - `rivers_large`：仅保留最宽的河道，适合小世界或希望减少图层噪点的场景。
 - `MajorRiversMany`：来自 Natural Earth 的河网版本，分支较多，风格不同于标准层。
 - `MajorRiversFew`：同一数据集的精简版本，仅保留洲际主干河流。
+
+
+docker build -f Docker/Dockerfile \
+  --build-arg ENABLE_TUNA_MIRROR=true \
+  -t world-generator:arm64v8 .
+
+docker run -idt --rm -v $(pwd):/workspace --name world_generator world-generator:arm64v8
+
+docker exec -it world_generator /bin/bash
+pip install -e . --break-system-packages
+apt update && apt install -y htop screen
+ulimit -s unlimited
+ulimit -n 100000
+python3 -m world_generator preprocess > log.log 2>&1
+ulimit -s unlimited
+ulimit -n 100000
+python3 -m world_generator tiles > log.log 2>&1

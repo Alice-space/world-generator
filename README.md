@@ -300,28 +300,28 @@ follows:
 
 ### Key inputs
 
-| Input | Provided via | Notes |
-| --- | --- | --- |
-| `config.yaml` | Copy from `config.example.yaml` | Defines absolute paths for every dependency plus numeric knobs (`blocks_per_tile`, `degree_per_tile`, `threads`, etc.). |
-| OpenStreetMap PBF (`pbf_path`) | Download from Geofabrik/planet | Raw geography source that is split per theme. |
-| QGIS projects (`qgis_project_path`, `qgis_bathymetry_project_path`, `qgis_terrain_project_path`, `qgis_heightmap_project_path`) | Bundled separately in `Data/qgis-*` | Provide layer styling and layout definitions used during exports. |
-| WorldPainter scripts (`scripts_folder_path/wpscript`, `wpscript.js`, `voidscript.js`, `worldpainter-script.zip`) | Download from the Minecraft Earth Map guide | Consumed by `wpscript` to build `.world` files; keep the directory structure intact. |
-| Optional layer toggles (`osm_switch`, `rivers`) | `config.yaml` | Enable/disable generated shapefiles per theme and pick which river layer name to reference inside the QGIS project. |
+| Input                                                                                                                           | Provided via                                | Notes                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `config.yaml`                                                                                                                   | Copy from `config.example.yaml`             | Defines absolute paths for every dependency plus numeric knobs (`blocks_per_tile`, `degree_per_tile`, `threads`, etc.). |
+| OpenStreetMap PBF (`pbf_path`)                                                                                                  | Download from Geofabrik/planet              | Raw geography source that is split per theme.                                                                           |
+| QGIS projects (`qgis_project_path`, `qgis_bathymetry_project_path`, `qgis_terrain_project_path`, `qgis_heightmap_project_path`) | Bundled separately in `Data/qgis-*`         | Provide layer styling and layout definitions used during exports.                                                       |
+| WorldPainter scripts (`scripts_folder_path/wpscript`, `wpscript.js`, `voidscript.js`, `worldpainter-script.zip`)                | Download from the Minecraft Earth Map guide | Consumed by `wpscript` to build `.world` files; keep the directory structure intact.                                    |
+| Optional layer toggles (`osm_switch`, `rivers`)                                                                                 | `config.yaml`                               | Enable/disable generated shapefiles per theme and pick which river layer name to reference inside the QGIS project.     |
 
 ### Generated artifacts
 
-| Output | Location | Produced by |
-| --- | --- | --- |
-| Layer-specific `.osm` files | `osm_folder_path/all/*.osm` | `osmium tags-filter` pipeline |
-| Geometry-fixed vector layers (GPKG by default) | `osm_folder_path/all/*.(gpkg|shp)` | `ogr2ogr` |
-| Per-tile rasters | `scripts_folder_path/image_exports/<TILE>/*` | `imageexport.export_image` |
-| Heightmaps (16-bit) | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
-| ImageMagick intermediates | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick` |
-| WorldPainter worlds | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world` | `wpscript.py` |
-| Tile exports | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca` | WorldPainter + Minutor automation |
-| Final Minecraft save | `scripts_folder_path/<world_name>/region/*.mca` | `tiles.post_process_map` |
-| Preview render | `scripts_folder_path/<world_name>.png` | Final Minutor call |
-| Logs | `generator.log` (or `--log-file`) | CLI logging configuration |
+| Output                                         | Location                                                        | Produced by                               |
+| ---------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------- |
+| Layer-specific `.osm` files                    | `osm_folder_path/all/*.osm`                                     | `osmium tags-filter` pipeline             |
+| Geometry-fixed vector layers (GPKG by default) | `osm_folder_path/all/*.(gpkg                                    | shp)`                                     | `ogr2ogr` |
+| Per-tile rasters                               | `scripts_folder_path/image_exports/<TILE>/*`                    | `imageexport.export_image`                |
+| Heightmaps (16-bit)                            | `scripts_folder_path/image_exports/<TILE>/heightmap/<TILE>.png` | `gdal_translate` step in `imageexport.py` |
+| ImageMagick intermediates                      | Same tile folders (`*_terrain_reduced_colors.png`, masks, etc.) | `magick.run_magick`                       |
+| WorldPainter worlds                            | `scripts_folder_path/wpscript/worldpainter_files/<TILE>.world`  | `wpscript.py`                             |
+| Tile exports                                   | `scripts_folder_path/wpscript/exports/<TILE>/region/*.mca`      | WorldPainter + Minutor automation         |
+| Final Minecraft save                           | `scripts_folder_path/<world_name>/region/*.mca`                 | `tiles.post_process_map`                  |
+| Preview render                                 | `scripts_folder_path/<world_name>.png`                          | Final Minutor call                        |
+| Logs                                           | `generator.log` (or `--log-file`)                               | CLI logging configuration                 |
 
 ## Project Structure
 
