@@ -210,4 +210,136 @@ def export_image(
             qgs.exitQgis()
 
 
-__all__ = ["fix_geometry", "export_image"]
+def export_image_multi(
+    config: GeneratorConfig,
+    project_path: str,
+    block_per_tile: int,
+    degree_per_tile: int,
+    x_range_min: int,
+    x_range_max: int,
+    y_range_min: int,
+    y_range_max: int,
+    layer_map: dict[str, tuple[str, ...]],
+) -> None:
+    """Export multiple layer groups from a single QGIS project in one process.
+
+    T004 optimization: load the QGIS project **once** and export all layer groups
+    sequentially within the same worker, instead of reloading the project for each
+    layer group.  Callers should partition work by longitude strip so that multiple
+    workers can operate on disjoint x-ranges in parallel.
+    """
+    _ensure_headless_env()
+    _inject_qgis_plugins()
+    from processing.core.Processing import Processing  # type: ignore
+    from qgis import processing  # type: ignore
+    from qgis.core import QgsProject  # type: ignore
+
+    qgs = None
+    project_ref = None
+    try:  # pragma: no cover - depends on QGIS runtime
+        qgs = _create_qgs_application()
+        Processing.initialize()
+
+        project = QgsProject.instance()
+        project_ref = project
+        project.read(project_path)
+        logger.info("QGIS loaded project %s (multi-layer export)", project.fileName())
+
+        all_map_layers = project.mapLayers().values()
+        layer_order = project.layerTreeRoot().layerOrder()
+        image_output_folder = config.image_exports_dir
+        map_units_per_pixel = degree_per_tile / block_per_tile
+
+        for layer_output_name, layer_prefixes in layer_map.items():
+            requested_layers = [
+                layer
+                for layer in all_map_layers
+                if any(layer.name().startswith(prefix) for prefix in layer_prefixes)
+            ]
+            if not requested_layers:
+                logger.warning(
+                    "No layers matched prefixes %s in project %s",
+                    layer_prefixes,
+                    project_path,
+                )
+                continue
+
+            requested_layers.sort(
+                key=lambda lyr: layer_order.index(lyr.id())
+                if lyr.id() in layer_order
+                else len(layer_order)
+            )
+
+            for x_min in range(x_range_min, x_range_max, degree_per_tile):
+                for y_min in range(y_range_min, y_range_max, degree_per_tile):
+                    x_max = x_min + degree_per_tile
+                    y_max = y_min + degree_per_tile
+                    tile = calculateTiles(x_min, y_max)
+                    output_folder = image_output_folder / tile
+                    output_folder.mkdir(parents=True, exist_ok=True)
+                    png_name = (
+                        output_folder / f"{tile}.png"
+                        if not layer_output_name
+                        else output_folder / f"{tile}_{layer_output_name}.png"
+                    )
+                    if png_name.exists():
+                        logger.info("Skipping %s", png_name.name)
+                        continue
+
+                    tif_name = png_name.with_suffix(".tif")
+                    params = {
+                        "EXTENT": f"{x_min},{x_max},{y_min},{y_max}",
+                        "EXTENT_BUFFER": 0,
+                        "TILE_SIZE": block_per_tile,
+                        "MAP_UNITS_PER_PIXEL": map_units_per_pixel,
+                        "MAKE_BACKGROUND_TRANSPARENT": True,
+                        "LAYERS": requested_layers,
+                        "OUTPUT": str(tif_name),
+                    }
+
+                    try:
+                        result = processing.run("native:rasterize", params)
+                        output_tif = Path(result.get("OUTPUT", tif_name))
+                    except Exception as run_exc:
+                        logger.error(
+                            "native:rasterize failed for %s/%s: %s",
+                            tile,
+                            layer_output_name,
+                            run_exc,
+                        )
+                        continue
+
+                    translate = subprocess.run(
+                        [
+                            "gdal_translate",
+                            "-of",
+                            "PNG",
+                            str(output_tif),
+                            str(png_name),
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if translate.returncode != 0:
+                        logger.error(
+                            "gdal_translate failed for %s/%s: %s",
+                            tile,
+                            layer_output_name,
+                            translate.stderr.strip(),
+                        )
+                    else:
+                        logger.info("Generated %s", png_name.name)
+                    try:
+                        output_tif.unlink(missing_ok=True)
+                    except Exception:
+                        logger.debug("Could not delete temp file %s", output_tif)
+    except Exception as exc:
+        logger.error("QGIS multi-layer export failed for %s: %s", project_path, exc)
+    finally:
+        if project_ref is not None:
+            project_ref.clear()
+        if qgs:
+            qgs.exitQgis()
+
+
+__all__ = ["fix_geometry", "export_image", "export_image_multi"]

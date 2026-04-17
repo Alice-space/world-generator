@@ -118,6 +118,11 @@ class GeneratorConfig:
     # Minutor 截图时的 Y 轴深度（方块坐标；319 为 Java 1.18+ 地表上限）
     minutor_depth: int = 319
 
+    # === 性能优化开关 ===
+    # 启用按瓦片流水线模式（T003）：image_export 完成后，magick+wp 按瓦片并行执行
+    # False = 旧模式（magick 全量完成后再串行调用 wp_generate）
+    tile_pipeline_mode: bool = False
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -288,6 +293,8 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         wp_biome_precision=_get_int("wp_biome_precision"),
         # Minutor 渲染
         minutor_depth=_get_int("minutor_depth"),
+        # 性能优化
+        tile_pipeline_mode=_coerce_bool(raw.get("tile_pipeline_mode", False)),
     )
 
 
