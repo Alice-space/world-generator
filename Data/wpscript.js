@@ -67,6 +67,7 @@ var STARTUP_ARGUMENTS = [
 })(arguments);
 
 load("utils.js");
+load("sections/lib/utils.js"); // shared helper functions for sections
 
 var SECTION_SEQUENCE = [
 	// shift calculations

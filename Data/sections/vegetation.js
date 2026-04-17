@@ -1,4 +1,5 @@
-//vegetation
+// vegetation
+// Requires: lib/utils.js (applyDensityMappingToLayer, loadTileImage)
 if (settingsVanillaPopulation === "False") {
 
 	var plainsFilter = wp.createFilter()
@@ -28,79 +29,26 @@ if (settingsVanillaPopulation === "False") {
 			.go();
 	}
 
-
-	var spruceImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_pine.png').go();
-	heightMap(spruceImage)
-		.applyToLayer(spruceLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	// --- Spruce / Pine trees ---
+	var spruceImage = loadTileImage('pine');
+	applyDensityMappingToLayer(spruceImage, spruceLayer, null);
 	heightMap(landuse)
 		.applyToLayer(spruceLayer)
 		.fromColour(127, 31, 0).toLevel(15)
 		.go();
 
-	var deciduousImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_deciduous.png').go();
-	heightMap(deciduousImage)
-		.applyToLayer(deciduousLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	// --- Deciduous trees ---
+	var deciduousImage = loadTileImage('deciduous');
+	applyDensityMappingToLayer(deciduousImage, deciduousLayer, null);
 	heightMap(landuse)
 		.applyToLayer(deciduousLayer)
 		.fromColour(127, 63, 0).toLevel(15)
 		.go();
 
-	var jungleImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_jungle.png').go();
-	heightMap(jungleImage)
-		.applyToLayer(smallTreeEvergreenLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
+	// --- Jungle / Evergreen trees ---
+	var jungleImage = loadTileImage('jungle');
+	// Non-jungle zones: apply all density to small trees first
+	applyDensityMappingToLayer(jungleImage, smallTreeEvergreenLayer, null);
 
 	wp.applyLayer(smallTreeEvergreenLayer)
 		.toWorld(world)
@@ -108,138 +56,43 @@ if (settingsVanillaPopulation === "False") {
 		.toLevel(0)
 		.go();
 
-	heightMap(jungleImage)
-		.withFilter(jungleFilter)
-		.applyToLayer(evergreenLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
+	// Jungle zones get full evergreen density
+	applyDensityMappingToLayer(jungleImage, evergreenLayer, jungleFilter);
 
-	var mixedImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_mixed.png').go();
+	// --- Mixed / Acacia vegetation ---
+	var mixedImage = loadTileImage('mixed');
 
-	heightMap(mixedImage)
-		.withFilter(savannahFilter)
-		.applyToLayer(acaciaLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	// Savannah and desert get acacia
+	applyDensityMappingToLayer(mixedImage, acaciaLayer, savannahFilter);
 	heightMap(landuse)
 		.withFilter(savannahFilter)
 		.applyToLayer(acaciaLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	heightMap(mixedImage)
-		.withFilter(desertFilter)
-		.applyToLayer(acaciaLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	applyDensityMappingToLayer(mixedImage, acaciaLayer, desertFilter);
 	heightMap(landuse)
 		.withFilter(desertFilter)
 		.applyToLayer(acaciaLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	heightMap(mixedImage)
-		.withFilter(plainsFilter)
-		.applyToLayer(mixedLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	// Plains and tundra get mixed layer
+	applyDensityMappingToLayer(mixedImage, mixedLayer, plainsFilter);
 	heightMap(landuse)
 		.withFilter(plainsFilter)
 		.applyToLayer(mixedLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	heightMap(mixedImage)
-		.withFilter(tundraFilter)
-		.applyToLayer(mixedLayer)
-		.fromLevels(0, 15).toLevel(0)
-		.fromLevels(16, 31).toLevel(1)
-		.fromLevels(32, 47).toLevel(2)
-		.fromLevels(48, 63).toLevel(3)
-		.fromLevels(64, 79).toLevel(4)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(6)
-		.fromLevels(112, 127).toLevel(7)
-		.fromLevels(128, 143).toLevel(8)
-		.fromLevels(144, 159).toLevel(9)
-		.fromLevels(160, 175).toLevel(10)
-		.fromLevels(176, 191).toLevel(11)
-		.fromLevels(192, 207).toLevel(12)
-		.fromLevels(208, 223).toLevel(13)
-		.fromLevels(224, 239).toLevel(14)
-		.fromLevels(240, 255).toLevel(15)
-		.go();
-
+	applyDensityMappingToLayer(mixedImage, mixedLayer, tundraFilter);
 	heightMap(landuse)
 		.withFilter(tundraFilter)
 		.applyToLayer(mixedLayer)
 		.fromColour(127, 127, 0).toLevel(15)
 		.go();
 
-	//remove arcacia on cold biomes
+	//remove acacia on cold biomes
 	heightMap(climateImage)
 		.applyToLayer(acaciaLayer)
 		.fromColour(200, 255, 80).toLevel(0) //Cfa - plains C8FF50
@@ -265,7 +118,7 @@ if (settingsVanillaPopulation === "False") {
 	//remove mixed on warm biomes
 	heightMap(climateImage)
 		.applyToLayer(mixedLayer)
-		.fromColour(0, 0, 255).toLevel(0) //Af - jungle_edge 0000FF 
+		.fromColour(0, 0, 255).toLevel(0) //Af - jungle_edge 0000FF
 		.fromColour(0, 120, 255).toLevel(0) //Am - jungle_edge 0078FF
 		.fromColour(70, 170, 250).toLevel(0) //Aw - savannah 46AAFA
 		.fromColour(255, 0, 0).toLevel(0) //BWh - desert FF0000
@@ -282,7 +135,9 @@ if (settingsVanillaPopulation === "False") {
 
 	if (settingsShrubs === "True") {
 
-		var shrubsImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_shrubs.png').go();
+		var shrubsImage = loadTileImage('shrubs');
+
+		// Plains shrubs (sparse at low density)
 		heightMap(shrubsImage)
 			.withFilter(plainsFilter)
 			.applyToLayer(shrubsLayer)
@@ -304,73 +159,17 @@ if (settingsVanillaPopulation === "False") {
 			.fromLevels(240, 255).toLevel(15)
 			.go();
 
-		heightMap(shrubsImage)
-			.withFilter(tundraFilter)
-			.applyToLayer(shrubsLayer)
-			.fromLevels(0, 15).toLevel(0)
-			.fromLevels(16, 31).toLevel(1)
-			.fromLevels(32, 47).toLevel(2)
-			.fromLevels(48, 63).toLevel(3)
-			.fromLevels(64, 79).toLevel(4)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(6)
-			.fromLevels(112, 127).toLevel(7)
-			.fromLevels(128, 143).toLevel(8)
-			.fromLevels(144, 159).toLevel(9)
-			.fromLevels(160, 175).toLevel(10)
-			.fromLevels(176, 191).toLevel(11)
-			.fromLevels(192, 207).toLevel(12)
-			.fromLevels(208, 223).toLevel(13)
-			.fromLevels(224, 239).toLevel(14)
-			.fromLevels(240, 255).toLevel(15)
-			.go();
+		// Tundra shrubs (full density mapping)
+		applyDensityMappingToLayer(shrubsImage, shrubsLayer, tundraFilter);
 
-		heightMap(shrubsImage)
-			.withFilter(desertFilter)
-			.applyToLayer(shrubsLayerWithCactuses)
-			.fromLevels(0, 15).toLevel(0)
-			.fromLevels(16, 31).toLevel(1)
-			.fromLevels(32, 47).toLevel(2)
-			.fromLevels(48, 63).toLevel(3)
-			.fromLevels(64, 79).toLevel(4)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(6)
-			.fromLevels(112, 127).toLevel(7)
-			.fromLevels(128, 143).toLevel(8)
-			.fromLevels(144, 159).toLevel(9)
-			.fromLevels(160, 175).toLevel(10)
-			.fromLevels(176, 191).toLevel(11)
-			.fromLevels(192, 207).toLevel(12)
-			.fromLevels(208, 223).toLevel(13)
-			.fromLevels(224, 239).toLevel(14)
-			.fromLevels(240, 255).toLevel(15)
-			.go();
-
-		heightMap(shrubsImage)
-			.withFilter(savannahFilter)
-			.applyToLayer(shrubsLayerWithCactuses)
-			.fromLevels(0, 15).toLevel(0)
-			.fromLevels(16, 31).toLevel(1)
-			.fromLevels(32, 47).toLevel(2)
-			.fromLevels(48, 63).toLevel(3)
-			.fromLevels(64, 79).toLevel(4)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(6)
-			.fromLevels(112, 127).toLevel(7)
-			.fromLevels(128, 143).toLevel(8)
-			.fromLevels(144, 159).toLevel(9)
-			.fromLevels(160, 175).toLevel(10)
-			.fromLevels(176, 191).toLevel(11)
-			.fromLevels(192, 207).toLevel(12)
-			.fromLevels(208, 223).toLevel(13)
-			.fromLevels(224, 239).toLevel(14)
-			.fromLevels(240, 255).toLevel(15)
-			.go();
+		// Desert and savannah get cactus shrubs
+		applyDensityMappingToLayer(shrubsImage, shrubsLayerWithCactuses, desertFilter);
+		applyDensityMappingToLayer(shrubsImage, shrubsLayerWithCactuses, savannahFilter);
 
 	}
 
 
-	var herbsImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_herbs.png').go();
+	var herbsImage = loadTileImage('herbs');
 	heightMap(herbsImage)
 		.applyToLayer(herbsLayer)
 		.fromLevels(0, 15).toLevel(0)
@@ -393,7 +192,7 @@ if (settingsVanillaPopulation === "False") {
 
 	if (isVersionAtLeast("1-16")) {
 
-		var witherRoseImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_wither_rose.png').go();
+		var witherRoseImage = loadTileImage('wither_rose');
 		heightMap(witherRoseImage)
 			.applyToLayer(halfetiRose)
 			.fromLevels(0, 253).toLevel(1)
@@ -406,4 +205,3 @@ if (settingsVanillaPopulation === "False") {
 	print("vegetation created");
 
 }
-
