@@ -122,8 +122,15 @@ wp_biome_precision: 8
 
 # === 性能调优 ===
 
-# Number of parallel workers for osmium, QGIS exports, ImageMagick, and WorldPainter.
+# Number of parallel workers for osmium, QGIS exports, and ImageMagick stages.
 threads: 20
+
+# === WorldPainter 性能 ===
+# WorldPainter (wpscript) 并行进程数（方案B：多进程并行，每个进程独立 JVM）。
+# 每个 JVM 实例约占用 4–6 GB 内存；总内存需求 = wp_parallel_workers × 6 GB。
+# 默认值 2（保守）；若内存充足可设为 4–8 以显著缩短生成时间。
+# 该值独立于 threads，仅控制 WorldPainter 阶段并发度。
+wp_parallel_workers: 2
 
 # === 世界参数 ===
 
