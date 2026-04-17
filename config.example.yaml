@@ -1,8 +1,9 @@
+# === 路径配置 ===
+
 # Root directory containing WorldPainter scripts, exports, and final worlds.
 # Defaults to the repository's ./Data directory if omitted.
 scripts_folder_path: "Data"
 
-# === Data Sources ===
 # Path to the planet PBF file; absolute paths or ones relative to `pwd` both work.
 pbf_path: "/workspace/Data/planet-latest.osm.pbf"
 
@@ -10,12 +11,16 @@ pbf_path: "/workspace/Data/planet-latest.osm.pbf"
 # Absolute or pwd-relative paths are supported.
 osm_folder_path: "/workspace/Data/osm/"
 
+# === OSM 预处理 ===
+
 # Vector driver used for cleaned exports. `GPKG` (default) avoids the 2GB Shapefile limit.
 # Set to `ESRI Shapefile` if you explicitly need legacy .shp outputs.
 vector_driver: GPKG
 
 # Primary QGIS project (land/vegetation/roads etc.) consumed by the export stage.
 qgis_project_path: "/workspace/Data/qgis-project/QGIS/MinecraftEarthTiles.qgz"
+
+# === 图像导出（QGIS）===
 
 # Additional QGIS projects for bathymetry/terrain/heightmap rendering.
 qgis_bathymetry_project_path: "/workspace/Data/qgis-bathymetry/QGIS/MinecraftEarthTiles_Bathymetry.qgz"
@@ -25,7 +30,103 @@ qgis_heightmap_project_path: "/workspace/Data/qgis-heightmap/QGIS/MinecraftEarth
 # Toggle high-quality terrain exports.
 use_high_quality_terrain: false
 
-# === World Parameters ===
+# === 图像导出（GDAL）===
+
+# gdal_translate 高程缩放源范围（单位：米）。
+# 地球陆地最低点约 -430m（死海），海洋最深约 -11000m；默认值 -1152 涵盖主要地形。
+# 减小 gdal_elevation_min 可容纳更深的海沟；增大 gdal_elevation_max 可容纳更高的山峰，
+# 但同时会压缩低海拔地区的高度分辨率。
+gdal_elevation_min: -1152
+gdal_elevation_max: 8848
+
+# gdal_translate 输出像素值范围，对应 UInt16 格式（0–65535）。
+# 通常不需要修改；调小 gdal_output_max 可以在 WorldPainter 中得到更低的地形。
+gdal_output_min: 0
+gdal_output_max: 65535
+
+# === 图像后处理（ImageMagick）===
+
+# 水体/河流遮罩二值化阈值（百分比）。
+# 值越小，越多接近黑色的像素会被纳入遮罩（水体范围越大）；
+# 建议范围：0.5–5.0。
+magick_water_threshold_pct: 1.0
+
+# 高程插值金字塔层数：通过连续缩小图像再放大来填充无效（无数据）像素。
+# 层数越多，填充范围越广，但内存和耗时也成倍增加。
+# 建议范围：6–14；10 为平衡值。
+magick_pyramid_levels: 10
+
+# 金字塔缩放滤波器，控制放大时的插值算法。
+# Gaussian：最平滑，边缘保留弱；Lanczos：锐度好但可能有振铃；Cubic：折中。
+# 可选值：Gaussian、Lanczos、Cubic、Box、Triangle 等（ImageMagick 支持的任意滤波器）。
+magick_pyramid_filter: "Gaussian"
+
+# 形态学运算结构元素，用于检测高程边缘（EdgeIn）以定位无效区域。
+# Diamond：4 邻域，仅上下左右；Disk：圆形邻域，范围更大；Square：8 邻域。
+# 可选值：Diamond、Disk、Square、Octagon 等。
+magick_morphology_kernel: "Diamond"
+
+# 地形高程图最终模糊半径（像素）。
+# 用于平滑相邻 tile 拼接处的高频噪点；设为 0 跳过模糊（速度更快但边缘可能突变）。
+# 建议范围：0–10。
+magick_terrain_blur_radius: 5
+
+# 水体填充后的电平微调（百分比）。
+# 将接近 0 的像素轻微提亮，避免水下区域被误判为零海拔。
+# 值越大，水底地形越高；建议范围：0.001–0.01。
+magick_water_level_adjust_pct: 0.002
+
+# 气候图下采样比例（百分比）。
+# 先缩小至此比例再放大 1 次，产生像素化/块状效果（Minecraft 风格气候分区）。
+# 50%% = 缩到一半再翻倍；设为 100%% 可跳过下采样。
+magick_climate_sample_pct: 50.0
+
+# 海洋温度图下采样比例（百分比）。
+# 值越小，像素块越大，海洋温度分区越粗糙。
+# 默认 12.5%% 配合 3 次 magnify = 先缩到 1/8 再 ×2×2×2 = 原始尺寸，但像素块为 8×8。
+magick_ocean_temp_sample_pct: 12.5
+
+# 海洋温度图放大次数（每次将分辨率翻倍）。
+# 应满足：sample_pct * 2^magnify_times ≈ 100%%，否则输出尺寸不匹配。
+magick_ocean_temp_magnify_times: 3
+
+# 地形调色板文件路径，相对于 scripts_folder_path。
+# 该文件包含 WorldPainter 可识别的地形颜色映射；修改可切换地形配色方案。
+magick_terrain_palette_rel_path: "wpscript/terrain/Standard.png"
+
+# === WorldPainter ===
+
+# WorldPainter 生成的 Minecraft 世界版本层范围（传递给 wpscript.js）。
+# "1-19" = 使用 Java Edition 1.19 的存档格式；如需其他版本请修改。
+wp_version_range: "1-19"
+
+# 世界海平面高度（Minecraft 方块坐标）。
+# Java Edition 1.18+ 默认海平面为 63；设为 0 可使地图整体下沉（不推荐）。
+wp_sea_level: 0
+
+# 世界最低高度（方块坐标）。
+# Java Edition 1.18+ 最低为 -64；旧版本为 0。
+wp_min_height: -64
+
+# 世界最高高度（方块坐标）。
+# Java Edition 1.18+ 最高为 2032；旧版本为 255。
+wp_max_height: 2032
+
+# 生物群系分配模式，决定 WorldPainter 如何映射气候/植被到 Minecraft 生物群系。
+# ecoregions：使用 WWF 生态区数据（默认，最真实）；climate：使用气候带数据。
+wp_biome_mode: "ecoregions"
+
+# 生物群系分区精细度（ecoregion 数量分桶）。
+# 值越大，生物群系边界越精细，但计算越慢；建议范围：4–16。
+wp_biome_precision: 8
+
+# === 性能调优 ===
+
+# Number of parallel workers for osmium, QGIS exports, ImageMagick, and WorldPainter.
+threads: 20
+
+# === 世界参数 ===
+
 # Minecraft save name; final world is written to `scripts_folder_path/<world_name>/`.
 world_name: Your_World_Name
 
@@ -38,10 +139,13 @@ degree_per_tile: 2
 # Height scale applied by WorldPainter to map meters into Minecraft blocks.
 height_ratio: 50
 
-# Number of parallel workers for osmium, QGIS exports, ImageMagick, and WorldPainter.
-threads: 20
+# Minutor 地图渲染截图时的 Y 轴深度（方块坐标）。
+# 319 为 Java Edition 1.18+ 的地表最高点（与 wp_max_height 对应）；
+# 旧版本应设为 255。
+minutor_depth: 319
 
-# === Layer Switches ===
+# === 图层开关 ===
+
 # Disable specific OSM layers to save disk or simplify the final world.
 osm_switch:
   aerodrome: false

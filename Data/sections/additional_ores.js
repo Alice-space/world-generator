@@ -1,368 +1,70 @@
-//additional ores
+// additional ores
+// Requires: lib/utils.js (applyDepositMappingToLayer, loadTileImage)
 if (settingsOres === "True") {
 
-	var clayImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_clay.png').go();
+	var clayImage = loadTileImage('clay');
+	applyDepositMappingToLayer(clayImage, clayDepositLayer);
 
-	heightMap(clayImage)
-		.applyToLayer(clayDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
+	var coalImage = loadTileImage('coal');
+	applyDepositMappingToLayer(coalImage, coalDepositLayer);
 
-	var coalImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_coal.png').go();
-
-	heightMap(coalImage)
-		.applyToLayer(coalDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
-
-	var diamondImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_diamond.png').go();
-
-	heightMap(diamondImage)
-		.applyToLayer(diamondDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
+	var diamondImage = loadTileImage('diamond');
+	applyDepositMappingToLayer(diamondImage, diamondDepositLayer);
 
 	if (isVersionAtLeast("1-18")) {
-		heightMap(diamondImage)
-			.applyToLayer(deepslateDiamondDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		applyDepositMappingToLayer(diamondImage, deepslateDiamondDepositLayer);
 	}
 
-	var goldImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_gold.png').go();
-
-	heightMap(goldImage)
-		.applyToLayer(goldDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
+	var goldImage = loadTileImage('gold');
+	applyDepositMappingToLayer(goldImage, goldDepositLayer);
 
 	if (isVersionAtLeast("1-18")) {
-		heightMap(goldImage)
-			.applyToLayer(deepslateGoldDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		applyDepositMappingToLayer(goldImage, deepslateGoldDepositLayer);
 	}
 
-	var ironImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_iron.png').go();
-
-	heightMap(ironImage)
-		.applyToLayer(ironDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
+	var ironImage = loadTileImage('iron');
+	applyDepositMappingToLayer(ironImage, ironDepositLayer);
 
 	if (isVersionAtLeast("1-18")) {
-		heightMap(ironImage)
-			.applyToLayer(deepslateIronDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		applyDepositMappingToLayer(ironImage, deepslateIronDepositLayer);
 	}
 
 	if ((isVersionAtLeast("1-16")) && settingsNetherite === "True") {
-		var netheriteImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_netherite.png').go();
-
-		heightMap(netheriteImage)
-			.applyToLayer(netheriteDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		var netheriteImage = loadTileImage('netherite');
+		applyDepositMappingToLayer(netheriteImage, netheriteDepositLayer);
 	}
 
-	var quartzImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_quartz.png').go();
+	var quartzImage = loadTileImage('quartz');
+	applyDepositMappingToLayer(quartzImage, quartzDepositLayer);
 
-	heightMap(quartzImage)
-		.applyToLayer(quartzDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
-
-	var redstoneImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_redstone.png').go();
-
-	heightMap(redstoneImage)
-		.applyToLayer(redstoneDepositLayer)
-		.fromLevels(0, 15).toLevel(8)
-		.fromLevels(16, 31).toLevel(7)
-		.fromLevels(32, 47).toLevel(7)
-		.fromLevels(48, 63).toLevel(6)
-		.fromLevels(64, 79).toLevel(6)
-		.fromLevels(80, 95).toLevel(5)
-		.fromLevels(96, 111).toLevel(5)
-		.fromLevels(112, 127).toLevel(4)
-		.fromLevels(128, 143).toLevel(4)
-		.fromLevels(144, 159).toLevel(3)
-		.fromLevels(160, 175).toLevel(3)
-		.fromLevels(176, 191).toLevel(2)
-		.fromLevels(192, 207).toLevel(2)
-		.fromLevels(208, 223).toLevel(1)
-		.fromLevels(224, 239).toLevel(1)
-		.fromLevels(240, 255).toLevel(0)
-		.go();
+	var redstoneImage = loadTileImage('redstone');
+	applyDepositMappingToLayer(redstoneImage, redstoneDepositLayer);
 
 	if (isVersionAtLeast("1-18")) {
-		heightMap(redstoneImage)
-			.applyToLayer(deepslateRedstoneDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		applyDepositMappingToLayer(redstoneImage, deepslateRedstoneDepositLayer);
 	}
 
 	if (isVersionAtLeast("1-17")) {
 
-		var copperImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_copper.png').go();
-
-		heightMap(copperImage)
-			.applyToLayer(copperDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		var copperImage = loadTileImage('copper');
+		applyDepositMappingToLayer(copperImage, copperDepositLayer);
 
 		if (isVersionAtLeast("1-18")) {
-			heightMap(copperImage)
-				.applyToLayer(deepslateCopperDepositLayer)
-				.fromLevels(0, 15).toLevel(8)
-				.fromLevels(16, 31).toLevel(7)
-				.fromLevels(32, 47).toLevel(7)
-				.fromLevels(48, 63).toLevel(6)
-				.fromLevels(64, 79).toLevel(6)
-				.fromLevels(80, 95).toLevel(5)
-				.fromLevels(96, 111).toLevel(5)
-				.fromLevels(112, 127).toLevel(4)
-				.fromLevels(128, 143).toLevel(4)
-				.fromLevels(144, 159).toLevel(3)
-				.fromLevels(160, 175).toLevel(3)
-				.fromLevels(176, 191).toLevel(2)
-				.fromLevels(192, 207).toLevel(2)
-				.fromLevels(208, 223).toLevel(1)
-				.fromLevels(224, 239).toLevel(1)
-				.fromLevels(240, 255).toLevel(0)
-				.go();
+			applyDepositMappingToLayer(copperImage, deepslateCopperDepositLayer);
 		}
 
 	}
 
 	if (mod_Create === "True") {
 
-		var mod_Create_zincImage = wp.getHeightMap().fromFile(path + 'image_exports/' + tile + '/' + tile + '_zinc.png').go();
+		var mod_Create_zincImage = loadTileImage('zinc');
 		var mod_Create_zincDepositLayer = loadLayerFromFile('wpscript/ores/mods/create_zinc_deposit.layer');
 		var mod_Create_deepslateZincDepositLayer = loadLayerFromFile('wpscript/ores/mods/create_zinc_deposit_deepslate.layer');
 
-		heightMap(mod_Create_zincImage)
-			.applyToLayer(mod_Create_zincDepositLayer)
-			.fromLevels(0, 15).toLevel(8)
-			.fromLevels(16, 31).toLevel(7)
-			.fromLevels(32, 47).toLevel(7)
-			.fromLevels(48, 63).toLevel(6)
-			.fromLevels(64, 79).toLevel(6)
-			.fromLevels(80, 95).toLevel(5)
-			.fromLevels(96, 111).toLevel(5)
-			.fromLevels(112, 127).toLevel(4)
-			.fromLevels(128, 143).toLevel(4)
-			.fromLevels(144, 159).toLevel(3)
-			.fromLevels(160, 175).toLevel(3)
-			.fromLevels(176, 191).toLevel(2)
-			.fromLevels(192, 207).toLevel(2)
-			.fromLevels(208, 223).toLevel(1)
-			.fromLevels(224, 239).toLevel(1)
-			.fromLevels(240, 255).toLevel(0)
-			.go();
+		applyDepositMappingToLayer(mod_Create_zincImage, mod_Create_zincDepositLayer);
 
 		if (isVersionAtLeast("1-18")) {
-
-			heightMap(mod_Create_zincImage)
-				.applyToLayer(mod_Create_deepslateZincDepositLayer)
-				.fromLevels(0, 15).toLevel(8)
-				.fromLevels(16, 31).toLevel(7)
-				.fromLevels(32, 47).toLevel(7)
-				.fromLevels(48, 63).toLevel(6)
-				.fromLevels(64, 79).toLevel(6)
-				.fromLevels(80, 95).toLevel(5)
-				.fromLevels(96, 111).toLevel(5)
-				.fromLevels(112, 127).toLevel(4)
-				.fromLevels(128, 143).toLevel(4)
-				.fromLevels(144, 159).toLevel(3)
-				.fromLevels(160, 175).toLevel(3)
-				.fromLevels(176, 191).toLevel(2)
-				.fromLevels(192, 207).toLevel(2)
-				.fromLevels(208, 223).toLevel(1)
-				.fromLevels(224, 239).toLevel(1)
-				.fromLevels(240, 255).toLevel(0)
-				.go();
-
+			applyDepositMappingToLayer(mod_Create_zincImage, mod_Create_deepslateZincDepositLayer);
 		}
 
 	}
@@ -379,4 +81,3 @@ if (true) {
 		.go();
 
 }
-
