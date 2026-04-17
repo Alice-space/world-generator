@@ -123,6 +123,11 @@ class GeneratorConfig:
     # False = 旧模式（magick 全量完成后再串行调用 wp_generate）
     tile_pipeline_mode: bool = False
 
+    # 同时启动的 WorldPainter (wpscript) 并行进程数（方案B）。
+    # 每个 JVM 实例约占用 4–6 GB 内存；默认 2 = 保守值，可按可用内存调大。
+    # 注意：该值独立于 threads，专用于 WP 阶段，避免与 QGIS/ImageMagick 争用资源。
+    wp_parallel_workers: int = 2
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -295,6 +300,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         minutor_depth=_get_int("minutor_depth"),
         # 性能优化
         tile_pipeline_mode=_coerce_bool(raw.get("tile_pipeline_mode", False)),
+        wp_parallel_workers=_get_int("wp_parallel_workers"),
     )
 
 
