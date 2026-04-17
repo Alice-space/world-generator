@@ -71,13 +71,14 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             tile_folder / f"{tile}_river_temp.png",
         ]
     )
+    threshold_arg = f"{config.magick_water_threshold_pct}%%"
     _run(
         [
             "convert",
             "-negate",
             tile_folder / f"{tile}_water_temp.png",
             "-threshold",
-            "1%%",
+            threshold_arg,
             tile_folder / f"{tile}_water_mask.png",
         ]
     )
@@ -87,7 +88,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "-negate",
             tile_folder / f"{tile}_river_temp.png",
             "-threshold",
-            "1%%",
+            threshold_arg,
             tile_folder / f"{tile}_river_mask.png",
         ]
     )
@@ -138,13 +139,16 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "A",
             "-morphology",
             "EdgeIn",
-            "Diamond",
+            config.magick_morphology_kernel,
             "-depth",
             "16",
             tile_folder / "heightmap" / f"{tile}_edges.png",
         ]
     )
-    cond = """( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% ) ( +clone -resize 50%% )""".split()
+    # 构建高程金字塔：连续缩小 N 次后再用 Gaussian 放大回原尺寸，用于填充无效像素
+    pyramid_step = "( +clone -resize 50%% )"
+    cond = (pyramid_step + " ") * config.magick_pyramid_levels
+    cond = cond.strip().split()
     _run(
         [
             "convert",
@@ -153,7 +157,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "-layers",
             "RemoveDups",
             "-filter",
-            "Gaussian",
+            config.magick_pyramid_filter,
             "-resize",
             f"{config.blocks_per_tile}x{config.blocks_per_tile}!",
             "-reverse",
@@ -212,13 +216,18 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "A",
             "-morphology",
             "EdgeIn",
-            "Diamond",
+            config.magick_morphology_kernel,
             "-depth",
             "16",
             tile_folder / "heightmap" / f"{tile}_water_edges.png",
         ]
     )
-    cond = f'( +clone -channel A -morphology EdgeIn Diamond +channel +write sparse-color:{tile_folder / "heightmap" / f"{tile}vf.txt"} -sparse-color Voronoi @{tile_folder / "heightmap" / f"{tile}vf.txt"}  -alpha off -depth 16 )'.split()
+    cond = (
+        f'( +clone -channel A -morphology EdgeIn {config.magick_morphology_kernel} +channel'
+        f' +write sparse-color:{tile_folder / "heightmap" / f"{tile}vf.txt"}'
+        f' -sparse-color Voronoi @{tile_folder / "heightmap" / f"{tile}vf.txt"}'
+        f"  -alpha off -depth 16 )"
+    ).split()
     _run(
         [
             "convert",
@@ -235,7 +244,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "convert",
             tile_folder / "heightmap" / f"{tile}_water_filled.png",
             "-level",
-            "0.002%%,100.002%%",
+            f"{config.magick_water_level_adjust_pct}%%,{100.0 + config.magick_water_level_adjust_pct}%%",
             tile_folder / "heightmap" / f"{tile}_water_filled.png",
         ]
     )
@@ -257,7 +266,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "convert",
             tile_folder / f"{tile}.png",
             "-blur",
-            "5",
+            str(config.magick_terrain_blur_radius),
             tile_folder / f"{tile}.png",
         ]
     )
@@ -266,26 +275,25 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "convert",
             tile_folder / f"{tile}_climate.png",
             "-sample",
-            "50%%",
+            f"{config.magick_climate_sample_pct}%%",
             "-magnify",
             "-define",
             "png:color-type=6",
             tile_folder / f"{tile}_climate.png",
         ]
     )
+    # 海洋温度图：先缩小到指定比例，再连续放大 N 次（每次 ×2）
+    magnify_args = ["-magnify"] * config.magick_ocean_temp_magnify_times
     _run(
         [
             "convert",
             tile_folder / f"{tile}_ocean_temp.png",
             "-sample",
-            "12.5%%",
-            "-magnify",
-            "-magnify",
-            "-magnify",
+            f"{config.magick_ocean_temp_sample_pct}%%",
+            *magnify_args,
             tile_folder / f"{tile}_ocean_temp.png",
         ]
     )
-    scripts_folder_path = config.scripts_folder_path
     _run(
         [
             "convert",
@@ -293,7 +301,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "-dither",
             "None",
             "-remap",
-            scripts_folder_path / "wpscript" / "terrain" / "Standard.png",
+            config.magick_terrain_palette_path,
             tile_folder / f"{tile}_terrain_reduced_colors.png",
         ]
     )

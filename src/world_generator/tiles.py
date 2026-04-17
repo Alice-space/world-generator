@@ -93,7 +93,7 @@ def post_process_map(config: GeneratorConfig) -> None:
             "--world",
             str(final_path),
             "--depth",
-            "319",
+            str(config.minutor_depth),
             "--savepng",
             str(output_png),
         ],
