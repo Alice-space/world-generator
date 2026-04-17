@@ -200,9 +200,38 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 
 ### 数据准备
 
-1. 从 [Tiles 安装指南](https://earth.motfe.net/tiles-installation/) 下载所需的数据文件
-2. 将所有数据文件提取到 `Data` 文件夹
-3. 根据您的需求配置 `config.yaml`
+QGIS 项目文件（约 252 GB）因体积过大无法纳入 git，托管于
+[HuggingFace Dataset](https://huggingface.co/datasets/Alice-space/world-generator-data)。
+运行以下命令一键下载全部数据（QGIS 项目文件 + OSM PBF）：
+
+```bash
+# 安装下载工具（如未安装）
+pip install huggingface_hub
+
+# 下载全部数据
+bash Data/download_data.sh
+
+# 如果网络受限，可使用镜像站：
+# export HF_ENDPOINT=https://hf-mirror.com
+# bash Data/download_data.sh
+
+# 仅下载 QGIS 项目文件（跳过 OSM PBF）：
+# bash Data/download_data.sh --skip-osm
+```
+
+私有仓库需要提供 HuggingFace token：
+
+```bash
+export HF_TOKEN=hf_your_token_here
+bash Data/download_data.sh
+```
+
+下载完成后根据您的需求配置 `config.yaml`：
+
+```bash
+cp config.example.yaml config.yaml
+# 编辑 config.yaml 填写路径参数
+```
 
 ### 运行生成器
 

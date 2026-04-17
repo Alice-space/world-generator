@@ -199,8 +199,40 @@ docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0
 
 ### Data Preparation
 
-1. Download required data files from [Tiles Installation Guide](https://earth.motfe.net/tiles-installation/)
-2. Extract all data files to the `Data` folder; the following is an example structure after setup:
+The QGIS project files (~252 GB total) are too large for git and are hosted on
+[HuggingFace Dataset](https://huggingface.co/datasets/Alice-space/world-generator-data).
+Run the following to download all required data in one step:
+
+```bash
+# Install download tool if not present
+pip install huggingface_hub
+
+# Download all data (QGIS project files + OSM PBF)
+bash Data/download_data.sh
+
+# For restricted networks, use a mirror:
+# export HF_ENDPOINT=https://hf-mirror.com
+# bash Data/download_data.sh
+
+# Download only QGIS project files (skip OSM PBF):
+# bash Data/download_data.sh --skip-osm
+```
+
+For private repos, supply a HuggingFace token:
+
+```bash
+export HF_TOKEN=hf_your_token_here
+bash Data/download_data.sh
+```
+
+After downloading, configure `config.yaml`:
+
+```bash
+cp config.example.yaml config.yaml
+# Edit config.yaml with your paths
+```
+
+The expected directory layout after setup:
 
 ```plaintext
 Data/
