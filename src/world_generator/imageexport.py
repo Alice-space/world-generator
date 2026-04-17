@@ -9,7 +9,7 @@ from pathlib import Path
 import pebble
 
 from .config import GeneratorConfig
-from .qgiscontroller import export_image
+from .qgiscontroller import export_image, export_image_multi
 from .tools import calculateTiles
 
 logger = logging.getLogger(__name__)
@@ -154,33 +154,39 @@ def _schedule_layer_exports(
     x_min_list: list[int],
     x_max_list: list[int],
 ) -> None:
+    """Schedule QGIS exports for all layers in *layer_map* from a single project.
+
+    T004 optimization: instead of creating a new ProcessPool per layer (which
+    causes each worker to reload the QGIS project for every layer), we create
+    **one** pool per project and dispatch all layers together.  Each worker
+    receives the full *layer_map* and calls ``export_image_multi``, loading the
+    project exactly once and iterating over all layers within the same process.
+    """
     log_files, mirror_console, log_level = _gather_logging_targets()
-    for name, layers in layer_map.items():
-        pool = pebble.ProcessPool(
-            max_workers=config.threads,
-            max_tasks=1,
-            context=mp.get_context("forkserver"),
-            initializer=_init_worker_logging,
-            initargs=[log_files, mirror_console, log_level],
+    pool = pebble.ProcessPool(
+        max_workers=config.threads,
+        max_tasks=1,
+        context=mp.get_context("forkserver"),
+        initializer=_init_worker_logging,
+        initargs=[log_files, mirror_console, log_level],
+    )
+    for idx in range(config.threads):
+        pool.schedule(
+            export_image_multi,
+            [
+                config,
+                str(project_path),
+                blocks_per_tile,
+                degree_per_tile,
+                x_min_list[idx],
+                x_max_list[idx],
+                -90,
+                90,
+                layer_map,
+            ],
         )
-        for idx in range(config.threads):
-            pool.schedule(
-                export_image,
-                [
-                    config,
-                    str(project_path),
-                    blocks_per_tile,
-                    degree_per_tile,
-                    x_min_list[idx],
-                    x_max_list[idx],
-                    -90,
-                    90,
-                    name,
-                    layers,
-                ],
-            )
-        pool.close()
-        pool.join()
+    pool.close()
+    pool.join()
 
 
 def image_export(config: GeneratorConfig) -> None:

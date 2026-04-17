@@ -1,4 +1,9 @@
-"""WorldPainter asset preparation powered by ImageMagick."""
+"""WorldPainter asset preparation powered by ImageMagick.
+
+T005 optimization: sequential convert calls that previously wrote intermediate
+files are merged into single chained convert commands using ``-write`` for any
+branch-points where an intermediate file is still needed later.
+"""
 
 import logging
 import multiprocessing as mp
@@ -35,116 +40,74 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         std_err += result.stderr
         return result
 
+    threshold_arg = f"{config.magick_water_threshold_pct}%%"
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 1: water mask pipeline
+    # Original: copy → draw-point → negate+threshold → transparent (4 calls)
+    # Merged:   1 call with intermediate -write for water_temp (not needed later)
+    # water.png → draw black point → negate+threshold → transparent → water_mask.png
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / f"{tile}_water.png",
-            tile_folder / f"{tile}_water_temp.png",
+            "-draw", "point 1,1",
+            "-fill", "black",
+            "-negate",
+            "-threshold", threshold_arg,
+            "-transparent", "black",
+            tile_folder / f"{tile}_water_mask.png",
         ]
     )
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 2: river mask pipeline (same pattern as water)
+    # Original: copy → draw-point → negate+threshold → transparent (4 calls)
+    # Merged:   1 call
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / f"{tile}_river.png",
-            tile_folder / f"{tile}_river_temp.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / f"{tile}_water_temp.png",
-            "-draw",
-            "point 1,1",
-            "-fill",
-            "black",
-            tile_folder / f"{tile}_water_temp.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / f"{tile}_river_temp.png",
-            "-draw",
-            "point 1,1",
-            "-fill",
-            "black",
-            tile_folder / f"{tile}_river_temp.png",
-        ]
-    )
-    threshold_arg = f"{config.magick_water_threshold_pct}%%"
-    _run(
-        [
-            "convert",
+            "-draw", "point 1,1",
+            "-fill", "black",
             "-negate",
-            tile_folder / f"{tile}_water_temp.png",
-            "-threshold",
-            threshold_arg,
-            tile_folder / f"{tile}_water_mask.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            "-negate",
-            tile_folder / f"{tile}_river_temp.png",
-            "-threshold",
-            threshold_arg,
+            "-threshold", threshold_arg,
+            "-transparent", "black",
             tile_folder / f"{tile}_river_mask.png",
         ]
     )
-    _run(
-        [
-            "convert",
-            tile_folder / f"{tile}_water_mask.png",
-            "-transparent",
-            "black",
-            tile_folder / f"{tile}_water_mask.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / f"{tile}_river_mask.png",
-            "-transparent",
-            "black",
-            tile_folder / f"{tile}_river_mask.png",
-        ]
-    )
+
+    # Composite water_mask over river_mask → water_transparent.png
     _run(
         [
             "composite",
-            "-gravity",
-            "center",
+            "-gravity", "center",
             tile_folder / f"{tile}_water_mask.png",
             tile_folder / f"{tile}_river_mask.png",
             tile_folder / f"{tile}_water_transparent.png",
         ]
     )
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 3: exported → removed_invalid → edges (2 calls → 1 call)
+    # Use -write to save _removed_invalid.png at the branch point.
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / "heightmap" / f"{tile}_exported.png",
-            "-transparent",
-            "black",
-            "-depth",
-            "16",
-            tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
-            "-channel",
-            "A",
-            "-morphology",
-            "EdgeIn",
-            config.magick_morphology_kernel,
-            "-depth",
-            "16",
+            "-transparent", "black",
+            "-depth", "16",
+            "-write", str(tile_folder / "heightmap" / f"{tile}_removed_invalid.png"),
+            "-channel", "A",
+            "-morphology", "EdgeIn", config.magick_morphology_kernel,
+            "-depth", "16",
             tile_folder / "heightmap" / f"{tile}_edges.png",
         ]
     )
+
     # 构建高程金字塔：连续缩小 N 次后再用 Gaussian 放大回原尺寸，用于填充无效像素
     pyramid_step = "( +clone -resize 50%% )"
     cond = (pyramid_step + " ") * config.magick_pyramid_levels
@@ -154,74 +117,56 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "convert",
             tile_folder / "heightmap" / f"{tile}_edges.png",
             *cond,
-            "-layers",
-            "RemoveDups",
-            "-filter",
-            config.magick_pyramid_filter,
-            "-resize",
-            f"{config.blocks_per_tile}x{config.blocks_per_tile}!",
+            "-layers", "RemoveDups",
+            "-filter", config.magick_pyramid_filter,
+            "-resize", f"{config.blocks_per_tile}x{config.blocks_per_tile}!",
             "-reverse",
-            "-background",
-            "None",
+            "-background", "None",
             "-flatten",
-            "-alpha",
-            "off",
-            "-depth",
-            "16",
+            "-alpha", "off",
+            "-depth", "16",
             tile_folder / "heightmap" / f"{tile}_invalid_filled.png",
         ]
     )
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 4: invalid_filled + removed_invalid → unsmoothed → water_blacked
+    # (2 calls → 1 call using -write to save unsmoothed at the branch point)
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / "heightmap" / f"{tile}_invalid_filled.png",
             tile_folder / "heightmap" / f"{tile}_removed_invalid.png",
-            "-compose",
-            "over",
+            "-compose", "over",
             "-composite",
-            "-depth",
-            "16",
-            tile_folder / "heightmap" / f"{tile}_unsmoothed.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / "heightmap" / f"{tile}_unsmoothed.png",
+            "-depth", "16",
+            "-write", str(tile_folder / "heightmap" / f"{tile}_unsmoothed.png"),
             tile_folder / f"{tile}_water_transparent.png",
-            "-compose",
-            "over",
+            "-compose", "over",
             "-composite",
-            "-depth",
-            "16",
+            "-depth", "16",
             tile_folder / "heightmap" / f"{tile}_water_blacked.png",
         ]
     )
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 5: water_blacked → water_removed → water_edges (2 calls → 1 call)
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / "heightmap" / f"{tile}_water_blacked.png",
-            "-transparent",
-            "white",
-            "-depth",
-            "16",
-            tile_folder / "heightmap" / f"{tile}_water_removed.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / "heightmap" / f"{tile}_water_removed.png",
-            "-channel",
-            "A",
-            "-morphology",
-            "EdgeIn",
-            config.magick_morphology_kernel,
-            "-depth",
-            "16",
+            "-transparent", "white",
+            "-depth", "16",
+            "-write", str(tile_folder / "heightmap" / f"{tile}_water_removed.png"),
+            "-channel", "A",
+            "-morphology", "EdgeIn", config.magick_morphology_kernel,
+            "-depth", "16",
             tile_folder / "heightmap" / f"{tile}_water_edges.png",
         ]
     )
+
     cond = (
         f'( +clone -channel A -morphology EdgeIn {config.magick_morphology_kernel} +channel'
         f' +write sparse-color:{tile_folder / "heightmap" / f"{tile}vf.txt"}'
@@ -233,40 +178,35 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
             "convert",
             tile_folder / "heightmap" / f"{tile}_water_edges.png",
             *cond,
-            "-compose",
-            "DstOver",
+            "-compose", "DstOver",
             "-composite",
             tile_folder / "heightmap" / f"{tile}_water_filled.png",
         ]
     )
+
+    # ---------------------------------------------------------------------------
+    # T005 Merge 6: water_filled level adjust + composite with water_removed → final
+    # Original: level-adjust in-place, then composite (2 calls → 1 call)
+    # ---------------------------------------------------------------------------
     _run(
         [
             "convert",
             tile_folder / "heightmap" / f"{tile}_water_filled.png",
             "-level",
             f"{config.magick_water_level_adjust_pct}%%,{100.0 + config.magick_water_level_adjust_pct}%%",
-            tile_folder / "heightmap" / f"{tile}_water_filled.png",
-        ]
-    )
-    _run(
-        [
-            "convert",
-            tile_folder / "heightmap" / f"{tile}_water_filled.png",
             tile_folder / "heightmap" / f"{tile}_water_removed.png",
-            "-compose",
-            "over",
+            "-compose", "over",
             "-composite",
-            "-depth",
-            "16",
+            "-depth", "16",
             tile_folder / "heightmap" / f"{tile}.png",
         ]
     )
+
     _run(
         [
             "convert",
             tile_folder / f"{tile}.png",
-            "-blur",
-            str(config.magick_terrain_blur_radius),
+            "-blur", str(config.magick_terrain_blur_radius),
             tile_folder / f"{tile}.png",
         ]
     )
@@ -274,11 +214,9 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         [
             "convert",
             tile_folder / f"{tile}_climate.png",
-            "-sample",
-            f"{config.magick_climate_sample_pct}%%",
+            "-sample", f"{config.magick_climate_sample_pct}%%",
             "-magnify",
-            "-define",
-            "png:color-type=6",
+            "-define", "png:color-type=6",
             tile_folder / f"{tile}_climate.png",
         ]
     )
@@ -288,8 +226,7 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         [
             "convert",
             tile_folder / f"{tile}_ocean_temp.png",
-            "-sample",
-            f"{config.magick_ocean_temp_sample_pct}%%",
+            "-sample", f"{config.magick_ocean_temp_sample_pct}%%",
             *magnify_args,
             tile_folder / f"{tile}_ocean_temp.png",
         ]
@@ -298,10 +235,8 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         [
             "convert",
             tile_folder / f"{tile}_terrain.png",
-            "-dither",
-            "None",
-            "-remap",
-            config.magick_terrain_palette_path,
+            "-dither", "None",
+            "-remap", config.magick_terrain_palette_path,
             tile_folder / f"{tile}_terrain_reduced_colors.png",
         ]
     )
