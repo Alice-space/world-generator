@@ -167,10 +167,14 @@ generator.log
 *.zip.st
 *.zip.*
 *.zip.*.st
-Data/qgis-project
-Data/qgis-bathymetry
-Data/qgis-terrain
-Data/qgis-heightmap
-Data**
+
+# Large data files managed via HuggingFace - run: bash Data/download_data.sh
+Data/qgis-project/
+Data/qgis-bathymetry/
+Data/qgis-terrain/
+Data/qgis-heightmap/
+Data/planet-*.osm.pbf
+Data/osm/
+workspace/
 
 .DS_Store
