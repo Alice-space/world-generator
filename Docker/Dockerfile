@@ -185,7 +185,7 @@ COPY Docker/imagemagick-policy.xml /workspace/Docker/imagemagick-policy.xml
 RUN pip install --break-system-packages --no-cache-dir -e /workspace
 
 # Pre-compile Java tools
-RUN javac -cp /opt/worldpainter/lib/* /workspace/tools/wp-config-writer/WriteConfig.java &&     javac -cp /opt/worldpainter/lib/* /workspace/tools/wp-config-reader/ReadConfig.java
+RUN javac -cp '/opt/worldpainter/lib/*' /workspace/tools/wp-config-writer/WriteConfig.java &&     javac -cp '/opt/worldpainter/lib/*' /workspace/tools/wp-config-reader/ReadConfig.java
 
 # Environment setup
 ENV MAGICK_CONFIGURE_PATH=/workspace/Docker     INSTALL4J_ADD_VM_PARAMS="-Xmx8G"
