@@ -166,14 +166,10 @@ RUN if [ "${ENABLE_TUNA_MIRROR}" = "true" ]; then \
 
 RUN mkdir -p /workspace
 
-# Compile WorldPainter config tools
-RUN cd /workspace && \
-    javac -cp /opt/worldpainter/lib/* tools/wp-config-writer/WriteConfig.java && \
-    javac -cp /opt/worldpainter/lib/* tools/wp-config-reader/ReadConfig.java
 
 WORKDIR /workspace
 
-COPY imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
+COPY Docker/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
 # start interactive shell by default
 CMD ["/bin/bash"]
