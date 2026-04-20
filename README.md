@@ -12,8 +12,8 @@ A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motf
 
 1. **Install via Docker (recommended)**
    ```bash
-   docker pull alicespaceli/trumancrafts_builder:v0.0.3
-   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+   docker pull alicespaceli/trumancrafts_builder:latest
+   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:latest
    ```
 
 2. **Download data**
