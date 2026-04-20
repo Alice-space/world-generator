@@ -170,12 +170,16 @@ cp config.example.yaml config.yaml
 
 ### Step 13: Configuration Files Setup
 
-Create necessary configuration directories:
+Create the WorldPainter configuration directory:
 
 ```bash
 mkdir -p ~/.local/share/worldpainter/config
-# Copy worldpainter config files if provided
 ```
+
+> **Note:** The WorldPainter `config` binary is **not included in the repository** (it is listed in `.gitignore`).
+> Instead, the pipeline uses a programmatic config writer that generates the correct `config` file at runtime,
+> so no manual copy is required. If you need to supply a custom config, place it at
+> `~/.local/share/worldpainter/config` before running the generator.
 
 ## Docker Installation (Recommended)
 

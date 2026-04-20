@@ -186,3 +186,43 @@ osm_switch:
 #   - MajorRiversMany: Alternate dataset with more branches, derived from Natural Earth.
 #   - MajorRiversFew: Same dataset but only the largest trunks.
 rivers: rivers_small
+
+# === WorldPainter Application Settings ===
+# These settings control the WorldPainter application configuration file
+# (~/.local/share/worldpainter/config). The pipeline generates this binary
+# file programmatically before running wpscript, replacing the old approach
+# of shipping an opaque Docker/config binary.
+
+# Disable automatic update checks (required for headless/batch operation).
+wp_app_check_for_updates: false
+
+# Default maximum world height for new worlds (blocks).
+# Standard Minecraft max is 256; Java 1.18+ supports up to 2032.
+wp_app_default_max_height: 256
+
+# Enable undo functionality. Increases memory usage but allows reverting mistakes.
+wp_app_undo_enabled: true
+
+# Number of undo levels to keep in memory.
+wp_app_undo_levels: 25
+
+# Disable autosave during batch processing to avoid unnecessary I/O.
+wp_app_autosave_enabled: false
+
+# Autosave interval in seconds (only applies if autosave is enabled).
+wp_app_autosave_interval: 300
+
+# Default game type for generated worlds: 0=Survival, 1=Creative, 2=Adventure, 3=Spectator.
+wp_app_default_game_type: 0
+
+# Allow cheats (commands) in generated worlds.
+wp_app_default_allow_cheats: false
+
+# Generate structures (villages, temples, etc.) in the world.
+wp_app_default_map_features: true
+
+# Maximum brush size in pixels. Large values needed for tile-scale operations.
+wp_app_maximum_brush_size: 5000
+
+# Minimum free disk space (bytes) before WorldPainter warns. 0 disables the check.
+wp_app_free_space_for_maps: 0

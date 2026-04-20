@@ -128,6 +128,17 @@ class GeneratorConfig:
     # 注意：该值独立于 threads，专用于 WP 阶段，避免与 QGIS/ImageMagick 争用资源。
     wp_parallel_workers: int = 2
 
+    # Use persistent JVM daemon pool for WorldPainter (vs spawning new process per tile)
+    wp_use_daemon: bool = True
+
+    # Maximum tiles per daemon worker before restart (memory leak mitigation)
+    wp_max_tiles_per_worker: int = 500
+
+    # === WorldPainter Application Settings ===
+    # Raw dict of wp_app_* settings passed to the Java config writer.
+    # Keys are stripped of the "wp_app_" prefix before passing as CLI args.
+    wp_app_settings: Mapping[str, Any] | None = None
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -250,6 +261,13 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         v = _opt_str(key)
         return v if v is not None else str(_defaults[key].default)
 
+    # Extract wp_app_* settings (passed through to Java config writer)
+    wp_app_settings = {
+        k[7:]: v  # strip "wp_app_" prefix -> e.g. "check_for_updates"
+        for k, v in raw.items()
+        if k.startswith("wp_app_")
+    }
+
     return GeneratorConfig(
         pbf_path=_expand_path(str(require("pbf_path"))),
         osm_folder_path=_expand_path(str(require("osm_folder_path"))),
@@ -301,6 +319,10 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         # 性能优化
         tile_pipeline_mode=_coerce_bool(raw.get("tile_pipeline_mode", False)),
         wp_parallel_workers=_get_int("wp_parallel_workers"),
+        wp_use_daemon=_coerce_bool(raw.get("wp_use_daemon", True)),
+        wp_max_tiles_per_worker=_get_int("wp_max_tiles_per_worker"),
+        # WorldPainter Application Settings
+        wp_app_settings=wp_app_settings or None,
     )
 
 

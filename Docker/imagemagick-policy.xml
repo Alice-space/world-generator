@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policymap>
+  <!-- Block remote access delegates -->
+  <policy domain="delegate" rights="none" pattern="URL" />
+  <policy domain="delegate" rights="none" pattern="HTTPS" />
+  <policy domain="delegate" rights="none" pattern="HTTP" />
+  <!-- Block risky coders (code execution vectors) -->
+  <policy domain="coder" rights="none" pattern="PS" />
+  <policy domain="coder" rights="none" pattern="PS2" />
+  <policy domain="coder" rights="none" pattern="PS3" />
+  <policy domain="coder" rights="none" pattern="EPS" />
+  <policy domain="coder" rights="none" pattern="PDF" />
+  <policy domain="coder" rights="none" pattern="XPS" />
+  <policy domain="coder" rights="none" pattern="SVG" />
+  <policy domain="coder" rights="none" pattern="MSL" />
+  <policy domain="coder" rights="none" pattern="MVG" />
+  <!-- Allow needed image formats -->
+  <policy domain="coder" rights="read|write" pattern="PNG" />
+  <policy domain="coder" rights="read|write" pattern="TIF" />
+  <policy domain="coder" rights="read|write" pattern="TIFF" />
+  <policy domain="coder" rights="read|write" pattern="TXT" />
+  <!-- Allow @file read for sparse-color Voronoi -->
+  <policy domain="path" rights="read|write" pattern="@*" />
+  <!-- Resource limits tuned for 2240x2240 16-bit tile processing -->
+  <policy domain="resource" name="memory" value="4GiB" />
+  <policy domain="resource" name="map" value="8GiB" />
+  <policy domain="resource" name="area" value="512MP" />
+  <policy domain="resource" name="disk" value="16GiB" />
+  <policy domain="resource" name="width" value="64KP" />
+  <policy domain="resource" name="height" value="64KP" />
+  <policy domain="resource" name="thread" value="4" />
+  <policy domain="resource" name="time" value="600" />
+</policymap>

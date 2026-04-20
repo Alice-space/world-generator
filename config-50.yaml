@@ -1,0 +1,67 @@
+# 1:50 Global Earth Map Configuration
+# 1 Minecraft block = 50 real-world meters
+# blocks_per_degree = 111320m / 50m = 2226.4, rounded up to 2240 (divisible by 32 for chunk alignment)
+# Total tiles: 360 x 180 = 64,800 (degree_per_tile=1)
+
+# Output directory on DataDisk2T (1.7 TB free, peak ~600 GB - 1 TB needed)
+scripts_folder_path: "/media/alice/DataDisk2T/world-generator-50"
+
+# Planet PBF source (89 GB, on SSD for fast reads)
+pbf_path: "/home/alice/Documents/SSDDataDisk1T/world-generator/Data/planet-251103.osm.pbf"
+
+# OSM preprocessed data output (on DataDisk2T alongside other outputs)
+osm_folder_path: "/media/alice/DataDisk2T/world-generator-50/osm"
+
+# QGIS project paths (on SSD for fast reads)
+qgis_project_path: "/home/alice/Documents/SSDDataDisk1T/world-generator/Data/qgis-project/QGIS/MinecraftEarthTiles.qgz"
+qgis_bathymetry_project_path: "/home/alice/Documents/SSDDataDisk1T/world-generator/Data/qgis-bathymetry/QGIS/MinecraftEarthTiles_Bathymetry.qgz"
+qgis_terrain_project_path: "/home/alice/Documents/SSDDataDisk1T/world-generator/Data/qgis-terrain/QGIS/MinecraftEarthTiles_Terrain.qgz"
+qgis_heightmap_project_path: "/home/alice/Documents/SSDDataDisk1T/world-generator/Data/qgis-heightmap/QGIS/MinecraftEarthTiles_Heightmap.qgz"
+
+use_high_quality_terrain: false
+world_name: "earth_1_50"
+
+# Scale: 2240 blocks per degree (1:50), 1 degree per tile
+blocks_per_tile: 2240
+degree_per_tile: 1
+
+# Vertical scale 50 maps to VERTICAL_SCALE_CONFIG["50"] = { legacy: [39, 239] }
+height_ratio: 50
+
+# 20 parallel threads for osmium, QGIS, and ImageMagick stages
+threads: 20
+
+# 8 WorldPainter workers (each ~6-8 GB JVM, total ~48-64 GB of 78 GB RAM)
+wp_parallel_workers: 8
+
+# Stage-by-stage mode (not tile pipeline) for first run stability
+tile_pipeline_mode: false
+
+# OSM layer switches: terrain-relevant layers enabled, roads/aerodrome disabled
+osm_switch:
+  aerodrome: false       # Not needed for terrain generation
+  bare_rock: true
+  beach: true
+  big_road: false        # Road layers disabled for cleaner terrain
+  border: true
+  farmland: true
+  forest: true
+  glacier: true
+  grass: true
+  highway: false         # Road layers disabled
+  meadow: true
+  middle_road: false     # Road layers disabled
+  quarry: true
+  river: true
+  small_road: false      # Road layers disabled
+  stateborder: false     # Sub-national borders not needed
+  stream: false          # Streams too fine-grained at 1:50
+  swamp: true
+  urban: true
+  volcano: true
+  water: true
+  wetland: true
+  vineyard: true
+
+# Medium river detail: good balance for 1:50 scale
+rivers: rivers_medium

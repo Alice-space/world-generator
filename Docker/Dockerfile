@@ -170,8 +170,7 @@ RUN mkdir -p /workspace
 
 WORKDIR /workspace
 
-# Remove ImageMagick security policies that block certain operations
-RUN rm -f /etc/ImageMagick-6/policy.xml /etc/ImageMagick-7/policy.xml /etc/ImageMagick/policy.xml
+COPY imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
 # start interactive shell by default
 CMD ["/bin/bash"]

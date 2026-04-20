@@ -178,3 +178,9 @@ Data/osm/
 workspace/
 
 .DS_Store
+Docker/config
+
+config-test.yaml
+err.log
+*.class
+.venv/
