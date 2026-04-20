@@ -196,9 +196,9 @@ rivers: rivers_small
 # Disable automatic update checks (required for headless/batch operation).
 wp_app_check_for_updates: false
 
-# Default maximum world height for new worlds (blocks).
+# Default maximum world height for new worlds (blocks). 2032 for Java 1.18+, 256 for legacy.
 # Standard Minecraft max is 256; Java 1.18+ supports up to 2032.
-wp_app_default_max_height: 256
+wp_app_default_max_height: 2032
 
 # Enable undo functionality. Increases memory usage but allows reverting mistakes.
 wp_app_undo_enabled: true
@@ -226,3 +226,27 @@ wp_app_maximum_brush_size: 5000
 
 # Minimum free disk space (bytes) before WorldPainter warns. 0 disables the check.
 wp_app_free_space_for_maps: 0
+
+# --- Additional WorldPainter generation fields (extracted from Docker/config) ---
+
+# Minecraft platform identifier. Determines save format and available features.
+# Common values: "org.pepsoft.anvil.1.20.5" (latest), "org.pepsoft.anvil.1.19"
+wp_app_default_platform_id: "org.pepsoft.anvil.1.20.5"
+
+# World water level (Minecraft block Y coordinate). Standard is 62 (Java Edition).
+wp_app_water_level: 62
+
+# Border level (block Y coordinate). Usually matches water level.
+wp_app_border_level: 62
+
+# Number of .world file backups to keep. 0 disables backups entirely.
+wp_app_world_file_backups: 3
+
+# Automatically delete old backups beyond the backup count.
+wp_app_auto_delete_backups: true
+
+# Minimum ore/resource layer level (0-15). Higher values reduce underground ores.
+wp_app_default_resources_minimum_level: 8
+
+# Delay before first autosave after a change (milliseconds). Only if autosave enabled.
+wp_app_autosave_delay: 60000

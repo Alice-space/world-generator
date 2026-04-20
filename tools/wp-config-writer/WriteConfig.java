@@ -19,6 +19,12 @@ public class WriteConfig {
         ARG_MAP.put("--autosave-interval", "autosaveInterval");
         ARG_MAP.put("--minimum-free-space", "minimumFreeSpaceForMaps");
         ARG_MAP.put("--default-platform-id", "defaultPlatformId");
+        ARG_MAP.put("--water-level", "waterLevel");
+        ARG_MAP.put("--border-level", "borderLevel");
+        ARG_MAP.put("--world-file-backups", "worldFileBackups");
+        ARG_MAP.put("--auto-delete-backups", "autoDeleteBackups");
+        ARG_MAP.put("--default-resources-minimum-level", "defaultResourcesMinimumLevel");
+        ARG_MAP.put("--autosave-delay", "autosaveDelay");
     }
 
     public static void main(String[] args) throws Exception {
