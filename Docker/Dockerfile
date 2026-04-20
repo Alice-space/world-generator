@@ -166,10 +166,31 @@ RUN if [ "${ENABLE_TUNA_MIRROR}" = "true" ]; then \
 
 RUN mkdir -p /workspace
 
-
 WORKDIR /workspace
 
+# Copy ImageMagick policy
 COPY Docker/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 
-# start interactive shell by default
-CMD ["/bin/bash"]
+# Copy source code and scripts into image
+COPY src/ /workspace/src/
+COPY Data/wpscript.js Data/utils.js Data/wp_daemon_driver.js /workspace/Data/
+COPY Data/sections/ /workspace/Data/sections/
+COPY Data/wpscript/ /workspace/Data/wpscript/
+COPY Data/download_data.sh /workspace/Data/
+COPY tools/ /workspace/tools/
+COPY pyproject.toml requirements.txt run.sh config.example.yaml /workspace/
+COPY Docker/imagemagick-policy.xml /workspace/Docker/imagemagick-policy.xml
+
+# Install Python package
+RUN pip install --break-system-packages --no-cache-dir -e /workspace
+
+# Pre-compile Java tools
+RUN javac -cp /opt/worldpainter/lib/* /workspace/tools/wp-config-writer/WriteConfig.java &&     javac -cp /opt/worldpainter/lib/* /workspace/tools/wp-config-reader/ReadConfig.java
+
+# Environment setup
+ENV MAGICK_CONFIGURE_PATH=/workspace/Docker     INSTALL4J_ADD_VM_PARAMS="-Xmx8G"
+
+# Entrypoint: supports running specific stages
+# Usage: docker run <image> [run|preprocess|tiles] [--config /path/to/config.yaml]
+ENTRYPOINT ["xvfb-run", "python3", "-m", "world_generator.cli"]
+CMD ["run", "--console"]

@@ -1,0 +1,29 @@
+# Large data files (must be mounted at runtime)
+Data/planet-*.osm.pbf
+Data/qgis-*/
+Data/osm/
+
+# Runtime artifacts
+*.world
+*.mca
+generator.log
+err.log
+image_exports/
+
+# Development
+venv/
+.venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.class
+*.egg-info/
+
+# Machine-specific configs
+config.yaml
+config-test.yaml
+config-50.yaml
+config-100.yaml
+PLAN.md
+tools/wp-config-reader/current-config.yaml

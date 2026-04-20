@@ -10,31 +10,24 @@ A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motf
 
 ## Quick Start
 
-1. **Install via Docker (recommended)**
+1. **Docker (recommended)**
    ```bash
-   docker pull alicespaceli/trumancrafts_builder:latest
-   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:latest
+   docker pull alicespaceli/world-generator:latest
    ```
 
-2. **Download data**
+2. **Download data** (~252 GB QGIS projects + 89 GB planet PBF):
    ```bash
-   pip install huggingface_hub
    bash Data/download_data.sh
    ```
 
-3. **Configure**
+3. **Configure**: copy and edit `config.docker.yaml` to set your data/output paths.
+
+4. **Run**:
    ```bash
-   cp config.example.yaml config.yaml
-   # Edit config.yaml — set paths and tile parameters
+   docker run -it --rm -v /path/to/data:/data -v /path/to/output:/output -v ./config.docker.yaml:/workspace/config.yaml alicespaceli/world-generator:latest
    ```
 
-4. **Run**
-   ```bash
-   ulimit -s unlimited && ulimit -n 100000
-   xvfb-run python3 main.py > generator.log
-   ```
-
-For a full bare-metal setup, follow the [Direct Installation Guide](#direct-installation-guide) below.
+   Run specific stages: append `preprocess --console` or `tiles --console` to the command.
 
 ## Table of Contents
 
@@ -219,10 +212,35 @@ For a containerized setup, use Docker:
 
 ```bash
 # Pull the pre-built image
-docker pull alicespaceli/trumancrafts_builder:v0.0.3
+docker pull alicespaceli/world-generator:latest
+
+# Run the full pipeline
+docker run -it --rm \
+  -v /path/to/data:/data \
+  -v /path/to/output:/output \
+  -v ./config.docker.yaml:/workspace/config.yaml \
+  alicespaceli/world-generator:latest
+
+# Run only preprocessing
+docker run -it --rm \
+  -v /path/to/data:/data \
+  -v /path/to/output:/output \
+  -v ./config.docker.yaml:/workspace/config.yaml \
+  alicespaceli/world-generator:latest preprocess --console
+
+# Run only tile generation
+docker run -it --rm \
+  -v /path/to/data:/data \
+  -v /path/to/output:/output \
+  -v ./config.docker.yaml:/workspace/config.yaml \
+  alicespaceli/world-generator:latest tiles --console
 
 # Run the container
-docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+docker run -it --rm \
+  -v /path/to/data:/data \
+  -v /path/to/output:/output \
+  -v ./config.docker.yaml:/workspace/config.yaml \
+  alicespaceli/world-generator:latest
 ```
 
 ## Usage

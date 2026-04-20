@@ -12,8 +12,8 @@
 
 1. **通过 Docker 安装（推荐）**
    ```bash
-   docker pull alicespaceli/trumancrafts_builder:v0.0.3
-   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+   docker pull alicespaceli/world-generator:latest
+   docker run -idt --rm -v $(pwd):/workspace alicespaceli/world-generator:latest
    ```
 
 2. **下载数据**
@@ -220,10 +220,10 @@ cp config.example.yaml config.yaml
 
 ```bash
 # 拉取预构建镜像
-docker pull alicespaceli/trumancrafts_builder:v0.0.3
+docker pull alicespaceli/world-generator:latest
 
 # 运行容器
-docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+docker run -idt --rm -v $(pwd):/workspace alicespaceli/world-generator:latest
 ```
 
 ## 使用方法

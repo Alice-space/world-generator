@@ -1,0 +1,51 @@
+# Docker container config template
+# Mount points expected:
+#   -v /path/to/data:/data        (planet PBF + QGIS projects)
+#   -v /path/to/output:/output    (generation output)
+#
+# Usage:
+#   docker run -v /your/data:/data -v /your/output:/output #     -v ./config.docker.yaml:/workspace/config.yaml #     alicespaceli/world-generator:latest
+
+scripts_folder_path: "/output"
+pbf_path: "/data/planet-latest.osm.pbf"
+osm_folder_path: "/output/osm"
+
+qgis_project_path: "/data/qgis-project/QGIS/MinecraftEarthTiles.qgz"
+qgis_bathymetry_project_path: "/data/qgis-bathymetry/QGIS/MinecraftEarthTiles_Bathymetry.qgz"
+qgis_terrain_project_path: "/data/qgis-terrain/QGIS/MinecraftEarthTiles_Terrain.qgz"
+qgis_heightmap_project_path: "/data/qgis-heightmap/QGIS/MinecraftEarthTiles_Heightmap.qgz"
+
+use_high_quality_terrain: false
+world_name: "earth_1_50"
+blocks_per_tile: 2240
+degree_per_tile: 1
+height_ratio: 50
+threads: 8
+wp_parallel_workers: 4
+
+osm_switch:
+  aerodrome: false
+  bare_rock: true
+  beach: true
+  big_road: false
+  border: true
+  farmland: true
+  forest: true
+  glacier: true
+  grass: true
+  highway: false
+  meadow: true
+  middle_road: false
+  quarry: true
+  river: true
+  small_road: false
+  stateborder: false
+  stream: false
+  swamp: true
+  urban: true
+  volcano: true
+  water: true
+  wetland: true
+  vineyard: true
+
+rivers: rivers_medium
