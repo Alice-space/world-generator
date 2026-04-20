@@ -166,7 +166,10 @@ RUN if [ "${ENABLE_TUNA_MIRROR}" = "true" ]; then \
 
 RUN mkdir -p /workspace
 
-# COPY config /root/.local/share/worldpainter/config
+# Compile WorldPainter config tools
+RUN cd /workspace && \
+    javac -cp /opt/worldpainter/lib/* tools/wp-config-writer/WriteConfig.java && \
+    javac -cp /opt/worldpainter/lib/* tools/wp-config-reader/ReadConfig.java
 
 WORKDIR /workspace
 

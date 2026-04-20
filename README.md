@@ -1,8 +1,40 @@
 # World Generator
 
-A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motfe.net/) that runs in parallel for improved performance.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## Overview
+
+A Minecraft world generator inspired by [Minecraft Earth Map](https://earth.motfe.net/) that runs in parallel for improved performance. The pipeline ingests OpenStreetMap data and QGIS-exported rasters, processes them through ImageMagick and WorldPainter, and produces a ready-to-play Minecraft world save.
 
 **中文安装指南** | [Chinese Installation Guide](README.zh.md)
+
+## Quick Start
+
+1. **Install via Docker (recommended)**
+   ```bash
+   docker pull alicespaceli/trumancrafts_builder:v0.0.3
+   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+   ```
+
+2. **Download data**
+   ```bash
+   pip install huggingface_hub
+   bash Data/download_data.sh
+   ```
+
+3. **Configure**
+   ```bash
+   cp config.example.yaml config.yaml
+   # Edit config.yaml — set paths and tile parameters
+   ```
+
+4. **Run**
+   ```bash
+   ulimit -s unlimited && ulimit -n 100000
+   xvfb-run python3 main.py > generator.log
+   ```
+
+For a full bare-metal setup, follow the [Direct Installation Guide](#direct-installation-guide) below.
 
 ## Table of Contents
 
@@ -145,10 +177,11 @@ C++ `osmium` command-line tool executed via subprocess; make sure it is on your
 
 ### Step 11: ImageMagick Configuration
 
-Remove restrictive ImageMagick policy:
+Install fine-grained ImageMagick policy (allows PNG/TIF, blocks risky coders):
 
 ```bash
-sudo rm /etc/ImageMagick-6/policy.xml
+# Install fine-grained ImageMagick policy (allows PNG/TIF, blocks risky coders)
+sudo cp Docker/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 ```
 
 ### Step 12: Project Setup
@@ -168,18 +201,11 @@ cp config.example.yaml config.yaml
 # Edit config.yaml according to your needs
 ```
 
-### Step 13: Configuration Files Setup
+### Step 13: WorldPainter Configuration
 
-Create the WorldPainter configuration directory:
-
-```bash
-mkdir -p ~/.local/share/worldpainter/config
-```
-
-> **Note:** The WorldPainter `config` binary is **not included in the repository** (it is listed in `.gitignore`).
-> Instead, the pipeline uses a programmatic config writer that generates the correct `config` file at runtime,
-> so no manual copy is required. If you need to supply a custom config, place it at
-> `~/.local/share/worldpainter/config` before running the generator.
+The pipeline automatically generates the WorldPainter application configuration
+at runtime using `tools/wp-config-writer/`. Customize settings via `wp_app_*`
+keys in your config YAML file. See `config.example.yaml` for all available options.
 
 ## Docker Installation (Recommended)
 
@@ -327,6 +353,8 @@ follows:
    combine the exported rasters with the WorldPainter template contained in
    `scripts_folder_path/wpscript/`, producing `.world` files and per-tile
    `region/` exports. Each tile also receives a quick-look render via Minutor.
+   When `wp_daemon_mode` is enabled in the config, WorldPainter is kept running
+   between tiles as a daemon, significantly reducing per-tile startup overhead.
 8. **Packaging & overview** (`tiles.post_process_map`): merges the exported
    `region/` directories into the final Minecraft save folder
    `scripts_folder_path/<world_name>/region/`, then runs Minutor once more to
@@ -373,6 +401,8 @@ follows:
 │   ├── wpscript.js               # Automation entry point consumed by `wpscript`
 │   └── voidscript.js, worldpainter-script.zip, etc.
 ├── Docker/                       # Container recipes (Dockerfile, compose examples)
+├── tools/
+│   └── wp-config-writer/         # Programmatic WorldPainter config generator
 ├── src/
 │   └── world_generator/
 │       ├── cli.py                # CLI entry point (`world-generator` console script)

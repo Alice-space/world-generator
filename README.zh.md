@@ -1,8 +1,40 @@
 # 世界生成器
 
-一个受 [Minecraft Earth Map](https://earth.motfe.net/) 启发的 Minecraft 世界生成器，支持并行运行以提高性能。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## 概述
+
+一个受 [Minecraft Earth Map](https://earth.motfe.net/) 启发的 Minecraft 世界生成器，支持并行运行以提高性能。流水线以 OpenStreetMap 数据和 QGIS 导出的栅格为输入，经 ImageMagick 和 WorldPainter 处理后，生成可直接游玩的 Minecraft 世界存档。
 
 **English Installation Guide** | [英文安装指南](README.md)
+
+## 快速开始
+
+1. **通过 Docker 安装（推荐）**
+   ```bash
+   docker pull alicespaceli/trumancrafts_builder:v0.0.3
+   docker run -idt --rm -v $(pwd):/workspace alicespaceli/trumancrafts_builder:v0.0.3
+   ```
+
+2. **下载数据**
+   ```bash
+   pip install huggingface_hub
+   bash Data/download_data.sh
+   ```
+
+3. **配置**
+   ```bash
+   cp config.example.yaml config.yaml
+   # 编辑 config.yaml，填写路径和分块参数
+   ```
+
+4. **运行**
+   ```bash
+   ulimit -s unlimited && ulimit -n 100000
+   xvfb-run python3 main.py > generator.log
+   ```
+
+完整的本地安装步骤请参见下方的[直接安装指南](#直接安装指南)。
 
 ## 目录
 
@@ -146,10 +178,11 @@ sudo apt install -y osmium-tool
 
 ### 步骤 11：ImageMagick 配置
 
-删除限制性的 ImageMagick 策略：
+安装精细化的 ImageMagick 策略文件（允许 PNG/TIF，屏蔽高风险编解码器）：
 
 ```bash
-sudo rm /etc/ImageMagick-6/policy.xml
+# 安装精细化的 ImageMagick 策略文件（允许 PNG/TIF，屏蔽高风险编解码器）
+sudo cp Docker/imagemagick-policy.xml /etc/ImageMagick-6/policy.xml
 ```
 
 ### 步骤 12：项目设置
@@ -169,14 +202,11 @@ cp config.example.yaml config.yaml
 # 根据您的需求编辑 config.yaml
 ```
 
-### 步骤 13：配置文件设置
+### 步骤 13：WorldPainter 配置
 
-创建必要的配置目录：
-
-```bash
-mkdir -p ~/.local/share/worldpainter/config
-# 如果提供了 worldpainter 配置文件，请复制
-```
+流水线在运行时会通过 `tools/wp-config-writer/` 自动生成 WorldPainter
+应用程序配置文件，无需手动操作。如需自定义设置，请在 `config.yaml`
+中修改 `wp_app_*` 相关字段。所有可用选项请参见 `config.example.yaml`。
 
 ## Docker 安装（推荐）
 
@@ -279,7 +309,7 @@ tail -f generator.log
 4. **QGIS 影像导出**（`imageexport.py` 与 `tiles.copy_osm_files`）：将生成的 OSM 文件软链/复制到 QGIS 工程目录，然后在无头模式下为所有选定图层逐瓦片导出到 `scripts_folder_path/image_exports/<TILE>/`。
 5. **高度图重采样**：仍在 `imageexport.py` 内，`gdal_translate` 将 `HQheightmap.tif` 切片为 16bit PNG，输出到各瓦片的 `heightmap/` 目录，分辨率由 `blocks_per_tile` 决定。
 6. **图像后处理**（`magick.py`）：调用 ImageMagick 统一调色板、生成水体掩膜、填补空洞，并生成匹配 WorldPainter 模板的 `*_terrain_reduced_colors.png` 等资源。
-7. **WorldPainter 自动化**（`wpscript.py`）：驱动 `wpscript` CLI，把导出的栅格与 `scripts_folder_path/wpscript/` 中的模板组合，产出 `.world` 文件和每瓦片的 `region/` 导出，同时用 Minutor 渲染快速预览。
+7. **WorldPainter 自动化**（`wpscript.py`）：驱动 `wpscript` CLI，把导出的栅格与 `scripts_folder_path/wpscript/` 中的模板组合，产出 `.world` 文件和每瓦片的 `region/` 导出，同时用 Minutor 渲染快速预览。开启配置中的 `wp_daemon_mode` 后，WorldPainter 将在瓦片间以守护进程方式保持运行，显著降低每个瓦片的启动开销。
 8. **打包与概览**（`tiles.post_process_map`）：汇总所有瓦片的 `region/` 到最终世界目录 `scripts_folder_path/<world_name>/region/`，再用 Minutor 生成 `<world_name>.png` 总览图。
 
 ## 输入与输出
@@ -323,6 +353,8 @@ tail -f generator.log
 │   ├── wpscript.js               # `wpscript` CLI 入口
 │   └── voidscript.js、worldpainter-script.zip 等资源
 ├── Docker/                       # Dockerfile 与 compose 示例
+├── tools/
+│   └── wp-config-writer/         # WorldPainter 配置文件程序化生成器
 ├── src/
 │   └── world_generator/
 │       ├── cli.py                # CLI 入口（`world-generator` 指令）
@@ -359,20 +391,3 @@ tail -f generator.log
 - `rivers_large`：仅保留最宽的河道，适合小世界或希望减少图层噪点的场景。
 - `MajorRiversMany`：来自 Natural Earth 的河网版本，分支较多，风格不同于标准层。
 - `MajorRiversFew`：同一数据集的精简版本，仅保留洲际主干河流。
-
-
-docker build -f Docker/Dockerfile \
-  --build-arg ENABLE_TUNA_MIRROR=true \
-  -t world-generator:arm64v8 .
-
-docker run -idt --rm -v $(pwd):/workspace --name world_generator world-generator:arm64v8
-
-docker exec -it world_generator /bin/bash
-pip install -e . --break-system-packages
-apt update && apt install -y htop screen
-ulimit -s unlimited
-ulimit -n 100000
-python3 -m world_generator preprocess > log.log 2>&1
-ulimit -s unlimited
-ulimit -n 100000
-python3 -m world_generator tiles > log.log 2>&1
