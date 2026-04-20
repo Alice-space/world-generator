@@ -184,3 +184,8 @@ config-test.yaml
 err.log
 *.class
 .venv/
+# Machine-specific configs (use config.example.yaml as template)
+config-50.yaml
+config-100.yaml
+tools/wp-config-reader/current-config.yaml
+PLAN.md
