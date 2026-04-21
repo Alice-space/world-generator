@@ -170,7 +170,7 @@ def _schedule_layer_exports(
         initializer=_init_worker_logging,
         initargs=[log_files, mirror_console, log_level],
     )
-    for idx in range(config.threads):
+    for idx in range(len(x_min_list)):
         pool.schedule(
             export_image_multi,
             [
@@ -197,11 +197,13 @@ def image_export(config: GeneratorConfig) -> None:
     blocks_per_tile = config.blocks_per_tile
     logger.info("Image export started")
 
-    x_range_per_thread = 360 / config.threads
-    x_min_list = [int(-180 + x_range_per_thread * i) for i in range(config.threads)]
-    x_max_list = [
-        int(-180 + x_range_per_thread * (i + 1)) for i in range(config.threads)
-    ]
+    # Use 6-degree strips (60 tasks) instead of 18-degree (20 tasks) for better
+    # load balancing. Workers that finish ocean-heavy strips pick up the next
+    # available strip, reducing the long-tail caused by data-dense regions.
+    strip_width = 6  # degrees per strip
+    num_strips = 360 // strip_width
+    x_min_list = [int(-180 + strip_width * i) for i in range(num_strips)]
+    x_max_list = [int(-180 + strip_width * (i + 1)) for i in range(num_strips)]
     x_max_list[-1] = 180
 
     dynamic_layers = _dynamic_layer_names(config)
