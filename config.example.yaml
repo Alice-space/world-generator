@@ -181,11 +181,11 @@ osm_switch:
 
 # QGIS river layer to export. Choose one of:
 #   - rivers_small: Dense network that keeps tributaries for detailed local maps.
-#   - rivers_medium: Balanced option (default) that trims very small streams.
+#   - rivers_medium: Balanced option that trims very small streams.
 #   - rivers_large: Only major rivers; useful to reduce clutter on small worlds.
 #   - MajorRiversMany: Alternate dataset with more branches, derived from Natural Earth.
-#   - MajorRiversFew: Same dataset but only the largest trunks.
-rivers: rivers_small
+#   - MajorRiversFew: Same dataset but only the largest trunks (default, fastest QGIS rendering).
+rivers: MajorRiversFew
 
 # === WorldPainter Application Settings ===
 # These settings control the WorldPainter application configuration file
