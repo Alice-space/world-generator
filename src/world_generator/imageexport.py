@@ -100,7 +100,12 @@ def _dynamic_layer_names(config: GeneratorConfig) -> dict[str, tuple[str, ...]]:
     layers["river"] = (config.rivers,)
     for ore in ORES:
         layers[ore] = (f"{ore}_ores",)
-    return layers
+    # Filter by osm_switch: skip layers explicitly disabled (e.g. border=false).
+    # Layers not in osm_switch (slope, climate, ecoregions, vegetation...) always render.
+    return {
+        name: prefixes for name, prefixes in layers.items()
+        if config.osm_switch.get(name, True)
+    }
 
 
 def _terrain_layer_names(config: GeneratorConfig) -> dict[str, tuple[str, ...]]:
@@ -189,6 +194,55 @@ def _schedule_layer_exports(
     pool.join()
 
 
+def _generate_placeholders_for_disabled(config: GeneratorConfig) -> None:
+    """Generate empty placeholder PNGs for layers disabled in osm_switch.
+
+    Downstream wpscript.js loads each layer's PNG unconditionally, so we
+    create black placeholder images (which apply no effect when used as
+    heightmap layers) for any layer whose osm_switch is False.
+    """
+    import os
+    import shutil
+    disabled = [
+        name for name in BASE_LAYER_NAMES
+        if name in config.osm_switch and not config.osm_switch[name]
+    ]
+    if not disabled:
+        return
+
+    template = config.scripts_folder_path / "_empty_placeholder.png"
+    if not template.exists():
+        logger.info("Creating empty placeholder template at %s", template)
+        result = subprocess.run(
+            ["convert", "-size", f"{config.blocks_per_tile}x{config.blocks_per_tile}",
+             "xc:black", str(template)],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            logger.error("Failed to create placeholder: %s", result.stderr)
+            return
+
+    logger.info("Generating placeholders for disabled layers: %s", disabled)
+    image_output_folder = config.image_exports_dir
+    degree_per_tile = config.degree_per_tile
+    count = 0
+    for x_min in range(-180, 180, degree_per_tile):
+        for y_min in range(-90, 90, degree_per_tile):
+            tile = calculateTiles(x_min, y_min + degree_per_tile)
+            tile_folder = image_output_folder / tile
+            tile_folder.mkdir(parents=True, exist_ok=True)
+            for layer in disabled:
+                target = tile_folder / f"{tile}_{layer}.png"
+                if target.exists():
+                    continue
+                try:
+                    os.link(template, target)
+                except OSError:
+                    shutil.copy(template, target)
+                count += 1
+    logger.info("Created %d placeholder PNGs for disabled layers", count)
+
+
 def image_export(config: GeneratorConfig) -> None:
     image_output_folder = config.image_exports_dir
     image_output_folder.mkdir(parents=True, exist_ok=True)
@@ -196,6 +250,11 @@ def image_export(config: GeneratorConfig) -> None:
     degree_per_tile = config.degree_per_tile
     blocks_per_tile = config.blocks_per_tile
     logger.info("Image export started")
+
+    # Generate empty placeholders for layers disabled in osm_switch.
+    # This must run BEFORE QGIS exports so workers see the placeholders and skip
+    # rendering those layers entirely.
+    _generate_placeholders_for_disabled(config)
 
     # Use 6-degree strips (60 tasks) instead of 18-degree (20 tasks) for better
     # load balancing. Workers that finish ocean-heavy strips pick up the next
