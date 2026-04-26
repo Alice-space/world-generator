@@ -159,7 +159,7 @@ osm_switch:
   bare_rock: true
   beach: true
   big_road: false
-  border: true
+  border: false       # Disabled - country borders rarely useful in Minecraft worlds
   farmland: true
   forest: true
   glacier: true
