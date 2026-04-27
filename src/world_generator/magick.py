@@ -31,6 +31,22 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         logger.info("Skipping Magick for %s", tile)
         return
 
+    # Validate required input files up-front so failures surface immediately
+    # instead of silently producing intermediate files but no final output.
+    palette = config.magick_terrain_palette_path
+    if not palette.exists():
+        raise FileNotFoundError(
+            f"Magick palette not found at {palette}. "
+            f"Ensure scripts_folder_path/wpscript/terrain/Standard.png exists "
+            f"(usually symlinked from the source repo's Data/wpscript/terrain/)."
+        )
+    terrain_input = tile_folder / f"{tile}_terrain.png"
+    if not terrain_input.exists():
+        raise FileNotFoundError(
+            f"Required terrain input missing: {terrain_input}. "
+            f"QGIS image_export must complete before run_magick."
+        )
+
     def _run(args: list[str | Path]) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
             [str(arg) for arg in args], capture_output=True, text=True
@@ -38,6 +54,11 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
         nonlocal std_out, std_err
         std_out += result.stdout
         std_err += result.stderr
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"convert failed (exit {result.returncode}) for tile {tile}: "
+                f"{result.stderr.strip()[:500]}"
+            )
         return result
 
     threshold_arg = f"{config.magick_water_threshold_pct}%%"

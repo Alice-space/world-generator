@@ -60,6 +60,60 @@ class WorldGenerationPipeline:
             raise RuntimeError(f"WriteConfig failed: {result.stderr}")
         self._logger.info("WorldPainter config generated: %s", result.stdout.strip())
 
+    def _ensure_workspace_assets(self) -> None:
+        """Symlink required source assets into scripts_folder_path.
+
+        wpscript.js, sections/, and the wpscript/ template files (1-19.world etc.)
+        live in the source repo's Data/ directory but are referenced by absolute
+        paths starting from scripts_folder_path. When users set scripts_folder_path
+        to a separate output directory, these assets need to be made available.
+
+        This method creates symlinks (idempotent: skips if already exists).
+        """
+        src_data = Path(__file__).resolve().parents[2] / "Data"
+        if not src_data.exists():
+            self._logger.warning("Source Data dir not found at %s, skipping symlink setup", src_data)
+            return
+
+        scripts = self.config.scripts_folder_path
+        scripts.mkdir(parents=True, exist_ok=True)
+
+        def _symlink_if_missing(src: Path, dst: Path) -> None:
+            if not src.exists():
+                return
+            if dst.is_symlink() or dst.exists():
+                return
+            try:
+                dst.symlink_to(src)
+                self._logger.debug("Symlinked %s -> %s", dst, src)
+            except OSError as exc:
+                self._logger.warning("Could not symlink %s -> %s: %s", dst, src, exc)
+
+        # Top-level JS assets and sections directory
+        for name in ("wpscript.js", "utils.js", "wp_daemon_driver.js", "sections"):
+            _symlink_if_missing(src_data / name, scripts / name)
+
+        # Some scripts reference the path with a Data/ subdirectory (legacy fallback)
+        data_subdir = scripts / "Data"
+        data_subdir.mkdir(exist_ok=True)
+        for name in ("wpscript.js", "utils.js", "wp_daemon_driver.js", "sections"):
+            _symlink_if_missing(src_data / name, data_subdir / name)
+
+        # WorldPainter template files (mixed with output dirs in wpscript/)
+        src_wpscript = src_data / "wpscript"
+        if src_wpscript.is_dir():
+            dst_wpscript = scripts / "wpscript"
+            dst_wpscript.mkdir(exist_ok=True)
+            template_items = [
+                "1-12.world", "1-16.world", "1-17.world",
+                "1-18.world", "1-18-ex.world", "1-19.world", "1-19-ex.world",
+                "farm", "layer", "ocean", "ores", "roads", "schematics",
+                "terrain", "void.png",
+            ]
+            for item in template_items:
+                _symlink_if_missing(src_wpscript / item, dst_wpscript / item)
+        self._logger.info("Workspace assets verified at %s", scripts)
+
     def generate_tiles(self) -> None:
         self._logger.info("Running tile generation stage")
         self._ensure_wp_config()
@@ -67,6 +121,7 @@ class WorldGenerationPipeline:
 
     def run_all(self) -> None:
         self._logger.info("Starting full world generation pipeline")
+        self._ensure_workspace_assets()
         self.preprocess()
         self.generate_tiles()
 

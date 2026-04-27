@@ -1,6 +1,7 @@
 """WorldPainter automation helpers."""
 
 import json
+from pathlib import Path
 import logging
 import multiprocessing as mp
 import os
@@ -246,7 +247,14 @@ class WPDaemon:
         """
         cfg = self.config
         scripts_folder = str(cfg.scripts_folder_path) + "/"
-        driver_js = str(cfg.scripts_folder_path / "Data" / "wp_daemon_driver.js")
+        # Look for wp_daemon_driver.js in scripts_folder first (where ensure_workspace_assets
+        # symlinks it). Fall back to the repo's source Data/ directory if missing.
+        candidates = [
+            cfg.scripts_folder_path / "wp_daemon_driver.js",
+            cfg.scripts_folder_path / "Data" / "wp_daemon_driver.js",
+            Path(__file__).resolve().parents[2] / "Data" / "wp_daemon_driver.js",
+        ]
+        driver_js = next((str(p) for p in candidates if p.exists()), str(candidates[0]))
         return [
             "wpscript",
             driver_js,
