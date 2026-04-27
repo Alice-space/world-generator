@@ -267,16 +267,16 @@ def image_export(config: GeneratorConfig) -> None:
 
     dynamic_layers = _dynamic_layer_names(config)
 
-    if config.use_high_quality_terrain:
-        _schedule_layer_exports(
-            config,
-            config.qgis_terrain_project_path,
-            _terrain_layer_names(config),
-            degree_per_tile,
-            blocks_per_tile,
-            x_min_list,
-            x_max_list,
-        )
+    # Always run terrain export — _terrain_layer_names selects TrueMarble (HQ)
+    # or backupterrain (non-HQ). Without this, magick later fails silently
+    # because <tile>_terrain.png never exists.
+    _schedule_layer_exports(
+        config,
+        config.qgis_terrain_project_path,
+        _terrain_layer_names(config),
+        degree_per_tile,
+        blocks_per_tile,
+    )
 
     _schedule_layer_exports(
         config,
