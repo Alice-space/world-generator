@@ -276,6 +276,8 @@ def image_export(config: GeneratorConfig) -> None:
         _terrain_layer_names(config),
         degree_per_tile,
         blocks_per_tile,
+        x_min_list,
+        x_max_list,
     )
 
     _schedule_layer_exports(
