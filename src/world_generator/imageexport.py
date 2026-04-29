@@ -284,15 +284,25 @@ def _schedule_layer_exports(
 
     if last_failures:
         logger.error(
-            "%s: %d strips still failed after %d attempts",
+            "%s: %d strips still failed after %d attempts; continuing pipeline",
             project_path.name, len(last_failures), MAX_ATTEMPTS,
         )
-        for idx, exc in last_failures[:5]:
-            logger.error("  strip idx=%d: %s", idx, exc)
-        raise RuntimeError(
-            f"{project_path.name}: {len(last_failures)} strips failed "
-            f"after {MAX_ATTEMPTS} attempts; first: idx={last_failures[0][0]} -> {last_failures[0][1]}"
-        )
+        for idx, exc in last_failures[:10]:
+            logger.error("  strip idx=%d (x_min=%d): %s",
+                         idx, x_min_list[idx], exc)
+        # Do NOT raise — abnormal-termination crashes are persistent for some
+        # strips (likely a QGIS internal bug on specific input data). Aborting
+        # the entire run loses all progress; let downstream stages run on
+        # what we have, and re-run this stage later for the remaining strips.
+        # Persist the failure list so users can audit.
+        try:
+            failure_log = config.scripts_folder_path / "image_export_failures.txt"
+            with failure_log.open("a") as fh:
+                fh.write("# " + project_path.name + "\n")
+                for idx, exc in last_failures:
+                    fh.write(f"strip_idx={idx} x_min={x_min_list[idx]} err={exc}\n")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not write failure log: %s", exc)
 
 
 def _generate_placeholders_for_disabled(config: GeneratorConfig) -> None:

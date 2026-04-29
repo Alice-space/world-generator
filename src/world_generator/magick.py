@@ -297,14 +297,21 @@ def magick_convert(config: GeneratorConfig) -> None:
             tile = tile_for_future.get(id(f), "<unknown>")
             failures.append((tile, exc))
     if failures:
-        logger.error("magick_convert: %d / %d tiles failed", len(failures), len(futures))
-        for tile, exc in failures[:5]:
+        logger.error("magick_convert: %d / %d tiles failed; continuing pipeline", len(failures), len(futures))
+        for tile, exc in failures[:10]:
             logger.error("  %s: %s", tile, exc)
-        raise RuntimeError(
-            f"magick_convert: {len(failures)} of {len(futures)} tiles failed; "
-            f"first failure: {failures[0][0]} -> {failures[0][1]}"
-        )
-    logger.info("magickConvert done")
+        # Persist failure list. Do not raise — incomplete tiles (caused by
+        # upstream image_export strip failures) are expected and we want
+        # the pipeline to finish whatever can be finished. WP stage will
+        # skip these tiles too via its own per-tile error handling.
+        try:
+            failure_log = config.scripts_folder_path / "magick_failures.txt"
+            with failure_log.open("a") as fh:
+                for tile, exc in failures:
+                    fh.write(f"tile={tile} err={exc}\n")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not write failure log: %s", exc)
+    logger.info("magickConvert done (%d ok, %d failed)", len(futures) - len(failures), len(failures))
 
 
 __all__ = ["run_magick", "magick_convert"]
