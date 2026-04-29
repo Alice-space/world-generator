@@ -175,8 +175,9 @@ def _schedule_layer_exports(
         initializer=_init_worker_logging,
         initargs=[log_files, mirror_console, log_level],
     )
+    futures = []
     for idx in range(len(x_min_list)):
-        pool.schedule(
+        f = pool.schedule(
             export_image_multi,
             [
                 config,
@@ -190,8 +191,27 @@ def _schedule_layer_exports(
                 layer_map,
             ],
         )
+        futures.append((idx, f))
     pool.close()
     pool.join()
+
+    # Surface worker exceptions — pebble swallows them by default. Without
+    # this, a silent failure (e.g. layer name typo) leaves zero output but
+    # the pipeline reports success.
+    failures = []
+    for idx, f in futures:
+        try:
+            f.result()
+        except BaseException as exc:  # noqa: BLE001
+            failures.append((idx, exc))
+    if failures:
+        logger.error("%s: %d / %d strips failed", project_path.name, len(failures), len(futures))
+        for idx, exc in failures[:3]:
+            logger.error("  strip idx=%d: %s", idx, exc)
+        raise RuntimeError(
+            f"{project_path.name}: {len(failures)} of {len(futures)} strips failed; "
+            f"first failure idx={failures[0][0]}: {failures[0][1]}"
+        )
 
 
 def _generate_placeholders_for_disabled(config: GeneratorConfig) -> None:

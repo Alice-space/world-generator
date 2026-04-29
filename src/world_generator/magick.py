@@ -274,12 +274,36 @@ def magick_convert(config: GeneratorConfig) -> None:
         max_tasks=1,
         context=mp.get_context("forkserver"),
     )
+    futures = []
+    tile_for_future = {}
     for x_min in range(-180, 180, degree_per_tile):
         for y_min in range(-90, 90, degree_per_tile):
             tile = calculateTiles(x_min, y_min + degree_per_tile)
-            pool.schedule(run_magick, [config, tile])
+            f = pool.schedule(run_magick, [config, tile])
+            futures.append(f)
+            tile_for_future[id(f)] = tile
     pool.close()
     pool.join()
+
+    # Check that workers actually succeeded — pebble swallows worker
+    # exceptions silently unless we call future.result(). Without this,
+    # silent run_magick failures produced an empty output set while the
+    # pipeline reported "magickConvert done".
+    failures: list[tuple[str, BaseException]] = []
+    for f in futures:
+        try:
+            f.result()
+        except BaseException as exc:  # noqa: BLE001
+            tile = tile_for_future.get(id(f), "<unknown>")
+            failures.append((tile, exc))
+    if failures:
+        logger.error("magick_convert: %d / %d tiles failed", len(failures), len(futures))
+        for tile, exc in failures[:5]:
+            logger.error("  %s: %s", tile, exc)
+        raise RuntimeError(
+            f"magick_convert: {len(failures)} of {len(futures)} tiles failed; "
+            f"first failure: {failures[0][0]} -> {failures[0][1]}"
+        )
     logger.info("magickConvert done")
 
 

@@ -129,10 +129,10 @@ def export_image(
             if any(layer.name().startswith(prefix) for prefix in layers)
         ]
         if not requested_layers:
-            logger.warning(
-                "No layers matched prefixes %s in project %s", layers, project_path
+            raise RuntimeError(
+                f"No QGIS layers matched prefixes {layers} in project {project_path}. "
+                f"Check that the layer names exist in the .qgz file."
             )
-            return
 
         # Preserve project drawing order to match on-canvas appearance.
         requested_layers.sort(
@@ -257,12 +257,10 @@ def export_image_multi(
                 if any(layer.name().startswith(prefix) for prefix in layer_prefixes)
             ]
             if not requested_layers:
-                logger.warning(
-                    "No layers matched prefixes %s in project %s",
-                    layer_prefixes,
-                    project_path,
+                raise RuntimeError(
+                    f"No QGIS layers matched prefixes {layer_prefixes} in project {project_path}. "
+                    f"Check that the layer names exist in the .qgz file."
                 )
-                continue
 
             requested_layers.sort(
                 key=lambda lyr: layer_order.index(lyr.id())
