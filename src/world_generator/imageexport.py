@@ -7,6 +7,8 @@ from logging import FileHandler, StreamHandler
 from pathlib import Path
 
 import pebble
+import zipfile
+import xml.etree.ElementTree as ET
 
 from .config import GeneratorConfig
 from .qgiscontroller import export_image, export_image_multi
@@ -150,6 +152,61 @@ def _init_worker_logging(
     logging.basicConfig(level=level, format=_LOG_FORMAT, handlers=handlers or None)
 
 
+def _list_qgis_layer_names(project_path: Path) -> list[str]:
+    """Return the names of all layers in a .qgz/.qgs project, fast path.
+
+    Uses zip + XML parsing instead of full QGIS API initialization (~30s).
+    Falls back to an empty list if the project format is unexpected.
+    """
+    try:
+        if str(project_path).endswith(".qgz"):
+            with zipfile.ZipFile(project_path) as zf:
+                qgs_name = next((n for n in zf.namelist() if n.endswith(".qgs")), None)
+                if not qgs_name:
+                    return []
+                with zf.open(qgs_name) as f:
+                    tree = ET.parse(f)
+        else:
+            tree = ET.parse(project_path)
+        root = tree.getroot()
+        names = [
+            (lt.findtext("layername") or "").strip()
+            for lt in root.iter("maplayer")
+        ]
+        return [n for n in names if n]
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not enumerate layers in %s: %s", project_path, exc)
+        return []
+
+
+def _filter_existing_layers(
+    project_path: Path,
+    layer_map: dict[str, tuple[str, ...]],
+) -> dict[str, tuple[str, ...]]:
+    """Drop layer_map entries whose prefixes don't match any layer in the project.
+
+    Without this, a single missing prefix (e.g. an ore that's only present
+    in some QGIS projects) raises and aborts the entire export. We log the
+    skipped entries so users can audit them.
+    """
+    existing = _list_qgis_layer_names(project_path)
+    if not existing:
+        return layer_map  # could not parse, fall through to runtime check
+    filtered: dict[str, tuple[str, ...]] = {}
+    skipped: list[str] = []
+    for name, prefixes in layer_map.items():
+        if any(any(layer.startswith(p) for layer in existing) for p in prefixes):
+            filtered[name] = prefixes
+        else:
+            skipped.append(name)
+    if skipped:
+        logger.info(
+            "Skipping %d layer(s) not found in %s: %s",
+            len(skipped), project_path.name, skipped,
+        )
+    return filtered
+
+
 def _schedule_layer_exports(
     config: GeneratorConfig,
     project_path: Path,
@@ -167,6 +224,10 @@ def _schedule_layer_exports(
     receives the full *layer_map* and calls ``export_image_multi``, loading the
     project exactly once and iterating over all layers within the same process.
     """
+    layer_map = _filter_existing_layers(project_path, layer_map)
+    if not layer_map:
+        logger.warning("%s: no matching layers, skipping export", project_path.name)
+        return
     log_files, mirror_console, log_level = _gather_logging_targets()
     pool = pebble.ProcessPool(
         max_workers=config.threads,
