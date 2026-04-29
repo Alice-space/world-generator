@@ -229,49 +229,69 @@ def _schedule_layer_exports(
         logger.warning("%s: no matching layers, skipping export", project_path.name)
         return
     log_files, mirror_console, log_level = _gather_logging_targets()
-    pool = pebble.ProcessPool(
-        max_workers=config.threads,
-        max_tasks=1,
-        context=mp.get_context("forkserver"),
-        initializer=_init_worker_logging,
-        initargs=[log_files, mirror_console, log_level],
-    )
-    futures = []
-    for idx in range(len(x_min_list)):
-        f = pool.schedule(
-            export_image_multi,
-            [
-                config,
-                str(project_path),
-                blocks_per_tile,
-                degree_per_tile,
-                x_min_list[idx],
-                x_max_list[idx],
-                -90,
-                90,
-                layer_map,
-            ],
-        )
-        futures.append((idx, f))
-    pool.close()
-    pool.join()
 
-    # Surface worker exceptions — pebble swallows them by default. Without
-    # this, a silent failure (e.g. layer name typo) leaves zero output but
-    # the pipeline reports success.
-    failures = []
-    for idx, f in futures:
-        try:
-            f.result()
-        except BaseException as exc:  # noqa: BLE001
-            failures.append((idx, exc))
-    if failures:
-        logger.error("%s: %d / %d strips failed", project_path.name, len(failures), len(futures))
-        for idx, exc in failures[:3]:
+    # Some strips occasionally fail with pebble "Abnormal termination" (worker
+    # crash, segfault, or transient resource issue). Retry failed strips up to
+    # MAX_ATTEMPTS times before aborting — already-rendered tiles are skipped
+    # by per-tile png_name.exists() checks, so retries are cheap.
+    MAX_ATTEMPTS = 3
+    pending_indices = list(range(len(x_min_list)))
+    last_failures: list[tuple[int, BaseException]] = []
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        if not pending_indices:
+            break
+        if attempt > 1:
+            logger.warning(
+                "%s: retrying %d failed strips (attempt %d/%d)",
+                project_path.name, len(pending_indices), attempt, MAX_ATTEMPTS,
+            )
+        pool = pebble.ProcessPool(
+            max_workers=config.threads,
+            max_tasks=1,
+            context=mp.get_context("forkserver"),
+            initializer=_init_worker_logging,
+            initargs=[log_files, mirror_console, log_level],
+        )
+        futures: list[tuple[int, object]] = []
+        for idx in pending_indices:
+            f = pool.schedule(
+                export_image_multi,
+                [
+                    config,
+                    str(project_path),
+                    blocks_per_tile,
+                    degree_per_tile,
+                    x_min_list[idx],
+                    x_max_list[idx],
+                    -90,
+                    90,
+                    layer_map,
+                ],
+            )
+            futures.append((idx, f))
+        pool.close()
+        pool.join()
+
+        # Surface worker exceptions — pebble swallows them otherwise.
+        last_failures = []
+        for idx, f in futures:
+            try:
+                f.result()
+            except BaseException as exc:  # noqa: BLE001
+                last_failures.append((idx, exc))
+        pending_indices = [idx for idx, _ in last_failures]
+
+    if last_failures:
+        logger.error(
+            "%s: %d strips still failed after %d attempts",
+            project_path.name, len(last_failures), MAX_ATTEMPTS,
+        )
+        for idx, exc in last_failures[:5]:
             logger.error("  strip idx=%d: %s", idx, exc)
         raise RuntimeError(
-            f"{project_path.name}: {len(failures)} of {len(futures)} strips failed; "
-            f"first failure idx={failures[0][0]}: {failures[0][1]}"
+            f"{project_path.name}: {len(last_failures)} strips failed "
+            f"after {MAX_ATTEMPTS} attempts; first: idx={last_failures[0][0]} -> {last_failures[0][1]}"
         )
 
 
