@@ -10,4 +10,4 @@ if [ -x "$SCRIPT_DIR/venv/bin/python3" ]; then
 else
     PYTHON=python3
 fi
-xvfb-run "$PYTHON" -m world_generator.cli "$@"
+xvfb-run "$PYTHON" -m world_generator "$@"
