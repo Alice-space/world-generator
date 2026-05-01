@@ -112,7 +112,7 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
         "False",
         "False",
     ]
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True, cwd=str(scripts_folder))
     logger.info("WorldPainter for %s output: %s", tile, result.stdout.strip())
     if result.stderr.strip():
         logger.error("WorldPainter for %s error: %s", tile, result.stderr.strip())
