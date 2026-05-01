@@ -71,7 +71,7 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     args = [
         "wpscript",
         str(script_js),
-        str(scripts_folder),
+        str(scripts_folder) + "/",  # wpscript.js loadLayerFromFile concatenates path + relativePath without separator
         tile[0:1],
         str(int(tile[1:3])),
         tile[3:4],
