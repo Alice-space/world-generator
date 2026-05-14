@@ -69,10 +69,18 @@ var STARTUP_ARGUMENTS = [
 load("utils.js");
 load("sections/lib/utils.js");
 
+// Load climateImage directly (water.js needs it for mangrove logic).
+// We skip the 2336-line climate.js which does full biome mapping —
+// we only need the heightmap image loaded for water.js reference checks.
+var climateImage = wp.getHeightMap().fromFile(
+	path + "image_exports/" + tile + "/" + tile + "_climate.png"
+).go();
+
 // Minimal section sequence for ocean-only tiles.
-// custom_biomes and filters are still needed by water.js for
-// BIOME_RIVER, noWaterFilter, noWaterFilterForRivers.
-// Skipped vs full wpscript.js: climate, terrain, vegetation,
+// climateImage is loaded above (just the PNG, no biome mapping).
+// custom_biomes provides BIOME_RIVER/BIOME_MANGROVE_SWAMP.
+// filters provides noWaterFilter/noWaterFilterForRivers/swampFilterBelowDegrees.
+// Skipped vs full wpscript.js: climate (full 2336 lines), terrain, vegetation,
 // steep_mountains, volcano, landuse, borders, water_depth_adjustments,
 // mixed_layer_cleanup, deepwater_cleanup, roads, vanilla_ores,
 // caves, additional_ores, populate_layers.
