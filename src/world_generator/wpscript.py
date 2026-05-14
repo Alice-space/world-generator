@@ -171,11 +171,19 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
         logger.warning("Skipping %s: image_exports missing or incomplete", tile)
         return
 
-    # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles
+    # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles.
+    # Also incrementally build the ocean_tiles.txt cache so future pipeline runs
+    # can use O(1) lookups instead of 0.4s identify calls.
     ocean = _is_ocean_tile(config, tile)
     if ocean:
         script_js = scripts_folder / "wpscript_ocean.js"
         logger.info("WorldPainter for %s (ocean fast path)", tile)
+        try:
+            cache_path = scripts_folder / "ocean_tiles.txt"
+            with cache_path.open("a") as fh:
+                fh.write(tile + "\n")
+        except OSError:
+            pass
     else:
         script_js = scripts_folder / "wpscript.js"
         logger.info("WorldPainter for %s", tile)
