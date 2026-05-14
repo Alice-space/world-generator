@@ -90,13 +90,13 @@ class WorldGenerationPipeline:
                 self._logger.warning("Could not symlink %s -> %s: %s", dst, src, exc)
 
         # Top-level JS assets and sections directory
-        for name in ("wpscript.js", "utils.js", "wp_daemon_driver.js", "sections"):
+        for name in ("wpscript.js", "wpscript_ocean.js", "utils.js", "wp_daemon_driver.js", "sections"):
             _symlink_if_missing(src_data / name, scripts / name)
 
         # Some scripts reference the path with a Data/ subdirectory (legacy fallback)
         data_subdir = scripts / "Data"
         data_subdir.mkdir(exist_ok=True)
-        for name in ("wpscript.js", "utils.js", "wp_daemon_driver.js", "sections"):
+        for name in ("wpscript.js", "wpscript_ocean.js", "utils.js", "wp_daemon_driver.js", "sections"):
             _symlink_if_missing(src_data / name, data_subdir / name)
 
         # WorldPainter template files (mixed with output dirs in wpscript/)

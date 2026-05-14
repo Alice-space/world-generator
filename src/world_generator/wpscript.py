@@ -78,6 +78,57 @@ def _run_minutor_world(config: GeneratorConfig, tile: str) -> None:
         logger.warning("minutor for %s error: %s", tile, render_result.stderr.strip())
 
 
+# Module-level cache of pure-ocean tiles loaded from the pre-scan file.
+# Populated once on first access to speed up ocean tile checks from O(0.4s
+# identify call) to O(1) dict lookup.
+_ocean_tile_cache: set[str] | None = None
+
+
+def _load_ocean_tile_cache(config: GeneratorConfig) -> set[str]:
+    """Load the pre-scanned ocean tile list from disk (one tile name per line)."""
+    global _ocean_tile_cache
+    if _ocean_tile_cache is not None:
+        return _ocean_tile_cache
+    cache_path = config.scripts_folder_path / "ocean_tiles.txt"
+    if cache_path.is_file():
+        try:
+            _ocean_tile_cache = set(
+                line.strip() for line in cache_path.read_text().splitlines()
+                if line.strip()
+            )
+            logger.info("Loaded %d ocean tiles from cache", len(_ocean_tile_cache))
+        except Exception as exc:
+            logger.warning("Failed to load ocean tile cache: %s", exc)
+            _ocean_tile_cache = set()
+    else:
+        _ocean_tile_cache = set()
+    return _ocean_tile_cache
+
+
+def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
+    """Check whether *tile* is a pure-ocean tile.
+
+    Uses the pre-scanned cache (``ocean_tiles.txt``) for O(1) lookups.  Falls
+    back to counting unique colours in the QGIS climate export with ImageMagick
+    if the cache is not yet available.
+    """
+    cache = _load_ocean_tile_cache(config)
+    if cache:
+        return tile in cache
+    # Slow path: inline identify call (0.4s)
+    climate_png = config.image_exports_dir / tile / f"{tile}_climate.png"
+    if not climate_png.is_file():
+        return False
+    try:
+        result = subprocess.run(
+            ["identify", "-format", "%k", str(climate_png)],
+            capture_output=True, text=True, timeout=10,
+        )
+        return result.returncode == 0 and result.stdout.strip() == "1"
+    except Exception:
+        return False
+
+
 def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     """Run WorldPainter for a single tile, then merge to final world and clean up.
 
@@ -90,14 +141,7 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     A per-tile sentinel file (``.tile_<TILE>.done``) in the final region dir
     marks completion so that re-runs skip already-processed tiles.
     """
-    logger.info("WorldPainter for %s", tile)
     scripts_folder = config.scripts_folder_path
-    script_js = scripts_folder / "wpscript.js"
-
-    exports_folder = scripts_folder / "wpscript" / "exports" / tile
-    world_file = scripts_folder / "wpscript" / "worldpainter_files" / f"{tile}.world"
-    world_file.parent.mkdir(parents=True, exist_ok=True)
-    exports_folder.parent.mkdir(parents=True, exist_ok=True)
 
     # Sentinel file in final world marks completed tiles
     final_region = config.world_output_dir / "region"
@@ -105,6 +149,20 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     if done_marker.exists():
         logger.info("Skipping WorldPainter for %s (already merged)", tile)
         return
+
+    # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles
+    ocean = _is_ocean_tile(config, tile)
+    if ocean:
+        script_js = scripts_folder / "wpscript_ocean.js"
+        logger.debug("Tile %s: ocean fast path", tile)
+    else:
+        script_js = scripts_folder / "wpscript.js"
+        logger.info("WorldPainter for %s", tile)
+
+    exports_folder = scripts_folder / "wpscript" / "exports" / tile
+    world_file = scripts_folder / "wpscript" / "worldpainter_files" / f"{tile}.world"
+    world_file.parent.mkdir(parents=True, exist_ok=True)
+    exports_folder.parent.mkdir(parents=True, exist_ok=True)
 
     # If .world file exists but exports were never merged (no done marker),
     # the previous attempt failed — clean up stale .world and retry.
