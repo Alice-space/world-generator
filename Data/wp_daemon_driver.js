@@ -3,10 +3,9 @@
 // Executed once per JVM lifetime by wpscript.  Loops over tile requests
 // from stdin.
 //
-// Uses Nashorn's loadWithNewGlobal() to isolate each tile's execution
-// in a fresh global scope.  This correctly records the source URL for
-// wpscript.js so that nested load("utils.js") and load("sections/...")
-// calls resolve relative to the script's directory.
+// Uses Nashorn's load() in the parent engine with global-state
+// save/restore between tiles.  This avoids the loadWithNewGlobal()
+// prototype-inheritance issue where `wp` is not visible.
 //
 // Protocol (NDJSON on stdin/stdout):
 //   → {"status": "ready"}
@@ -80,20 +79,18 @@ var stdin  = new java.io.BufferedReader(
 java.lang.System.setOut(java.lang.System.err);
 
 // -------------------------------------------------------------------
-// 3. Build the full arguments array matching wpscript.js STARTUP_ARGUMENTS.
+// 3. Per-tile execution via load() in the parent engine
 //
-//    loadWithNewGlobal(script, arg0, arg1, …) passes the extra arguments
-//    as the script's top-level `arguments` array, which wpscript.js's
-//    (function(args){…})(arguments) IIFE reads.
-//
-//    Order: 0:path, 1:dirLat, 2:lat, 3:dirLon, 4:lon,
-//           5:scale, 6:tilesPerMap, 7:verticalScale,
-//           8-26:settings*, 27:mapVersion, 28:mapOffset,
-//           29:lowerLimit, 30:upperLimit, 31:vanillaPop,
-//           32:heightmapName, 33:biomeSource, 34:oreModifier,
-//           35-39:mod_*
+//    We save the current global-property snapshot before each tile,
+//    update tile-specific globals (directionLatitude, latitude, …),
+//    load() wpscript.js (which executes inline), then delete any
+//    properties that the script added and restore overwritten ones.
+//    This keeps the engine clean without needing a child scope.
 // -------------------------------------------------------------------
 
+var scriptPath = staticArgs.path + "/wpscript.js";
+
+// Build the full arguments array matching wpscript.js STARTUP_ARGUMENTS.
 function buildFullArgs(stArgs, msg) {
 	return [
 		stArgs.path,
@@ -139,45 +136,70 @@ function buildFullArgs(stArgs, msg) {
 	];
 }
 
-// -------------------------------------------------------------------
-// 4. Per-tile execution via loadWithNewGlobal()
-//
-//    loadWithNewGlobal creates a fresh Nashorn global whose [[Prototype]]
-//    is the current (daemon-driver) global.  This means `wp` (injected
-//    by WorldPainter's Java host into the driver's global) is visible
-//    inside wpscript.js via prototype inheritance.
-//
-//    The script path must be canonical (no symlinks) so Nashorn can
-//    derive a directory URL for nested load() resolution.
-// -------------------------------------------------------------------
-
-var _canonicalScriptPath = null;
-
-function getCanonicalScriptPath() {
-	if (_canonicalScriptPath !== null) return _canonicalScriptPath;
-	var f = new java.io.File(staticArgs.path + "/wpscript.js");
-	_canonicalScriptPath = String(f.getCanonicalPath());
-	return _canonicalScriptPath;
-}
-
 function runTile(msg) {
 	var fullArgs = buildFullArgs(staticArgs, msg);
 
-	// Set user.dir before loadWithNewGlobal so that scripts which use
-	// File I/O resolve relative paths correctly.
-	var origCwd = java.lang.System.getProperty("user.dir");
-	java.lang.System.setProperty("user.dir", staticArgs.path);
+	// Save a snapshot of current global property names.
+	// We only snapshot OWN properties (not inherited) to keep it fast.
+	var saved = {};
+	var beforeKeys = Object.getOwnPropertyNames(this);
+	for (var k = 0; k < beforeKeys.length; k += 1) {
+		var key = beforeKeys[k];
+		saved[key] = this[key];
+	}
 
-	try {
-		var argsForLoad = [getCanonicalScriptPath()].concat(fullArgs);
-		loadWithNewGlobal.apply(null, argsForLoad);
-	} finally {
-		java.lang.System.setProperty("user.dir", origCwd);
+	// Inject tile-specific arguments as global variables.
+	// wpscript.js reads these via GLOBAL_CONTEXT[name] (assigned by
+	// the assignStartupArguments IIFE).
+	var specOrder = [
+		"path", "directionLatitude", "latitude", "directionLongitute",
+		"longitute", "scale", "tilesPerMap", "verticalScale",
+		"settingsBorders", "settingsStateBorders", "settingsHighways",
+		"settingsStreets", "settingsSmallStreets", "settingsBuildings",
+		"settingsOres", "settingsNetherite", "settingsFarms",
+		"settingsMeadows", "settingsQuarrys", "settingsAerodrome",
+		"settingsMobSpawner", "settingsAnimalSpawner",
+		"settingsRivers", "settingsStreams", "settingsVolcanos",
+		"settingsShrubs", "settingsCrops", "settingsMapVersion",
+		"settingsMapOffset", "settingsLowerBuildLimit",
+		"settingsUpperBuildLimit", "settingsVanillaPopulation",
+		"heightmapName", "biomeSource", "oreModifier",
+		"mod_BOP", "mod_BYG", "mod_Terralith",
+		"mod_williamWythers", "mod_Create"
+	];
+	for (var j = 0; j < specOrder.length; j += 1) {
+		this[specOrder[j]] = fullArgs[j];
+	}
+
+	// Also provide `arguments` as a JS array for wpscript.js compatibility.
+	this["arguments"] = fullArgs;
+
+	// Execute wpscript.js via Nashorn's load().  This uses the parent
+	// global scope so `wp` and all built-ins are directly available.
+	load(scriptPath);
+
+	// Cleanup: delete properties added by the script and restore
+	// overwritten ones.
+	var afterKeys = Object.getOwnPropertyNames(this);
+	for (var m = 0; m < afterKeys.length; m += 1) {
+		var key2 = afterKeys[m];
+		if (key2 in saved) {
+			// Restore original value
+			this[key2] = saved[key2];
+		} else {
+			// Delete if not in saved snapshot (added by wpscript.js)
+			// Skip built-in / internal properties
+			if (key2 === "arguments" || key2 === "wp" ||
+			    key2 === "GLOBAL_CONTEXT") {
+				continue;
+			}
+			try { delete this[key2]; } catch (e) { /* non-configurable */ }
+		}
 	}
 }
 
 // -------------------------------------------------------------------
-// 5. Main loop
+// 4. Main loop
 // -------------------------------------------------------------------
 
 stdout.println(JSON.stringify({ status: "ready" }));
@@ -201,9 +223,15 @@ while ((line = stdin.readLine()) !== null) {
 
 	var tileName = String(msg.tile || "unknown");
 	try {
+		var origCwd = java.lang.System.getProperty("user.dir");
+		java.lang.System.setProperty("user.dir", staticArgs.path);
+
 		runTile(msg);
+
+		java.lang.System.setProperty("user.dir", origCwd);
 		stdout.println(JSON.stringify({ status: "done", tile: tileName }));
 	} catch (tileErr) {
+		try { java.lang.System.setProperty("user.dir", origCwd); } catch (e) {}
 		var sw = new java.io.StringWriter();
 		tileErr.printStackTrace(new java.io.PrintWriter(sw));
 		java.lang.System.err.println("[wp_daemon_driver] ERROR tile=" + tileName + " : " + sw);
