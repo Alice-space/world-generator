@@ -139,6 +139,10 @@ def _process_single_tile(args: tuple) -> None:
         args: (config, tile) tuple — pebble passes a single positional arg.
     """
     config, tile = args
+    done_marker = config.world_output_dir / "region" / f".tile_{tile}.done"
+    if done_marker.exists():
+        logger.info("Pipeline: tile %s already done, skipping", tile)
+        return
     try:
         run_magick(config, tile)
         run_world_painter(config, tile)

@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 
 def run_magick(config: GeneratorConfig, tile: str) -> None:
     logger.info("Magick for %s", tile)
+
+    # Skip tile if already merged into final world (done marker present).
+    # Image exports are cleaned up by _merge_and_cleanup, so the check must
+    # happen before any file existence tests on the tile's image_exports dir.
+    done_marker = config.world_output_dir / "region" / f".tile_{tile}.done"
+    if done_marker.exists():
+        logger.info("Skipping Magick for %s (already done)", tile)
+        return
+
     std_out = ""
     std_err = ""
     image_output_folder = config.image_exports_dir
