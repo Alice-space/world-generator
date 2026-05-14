@@ -1,14 +1,7 @@
 //export
 if (true) {
 
-	//last but not least, save the world
-	wp.saveWorld(world)
-		.toFile(path + 'wpscript/worldpainter_files/' + tile + '.world')
-		.go();
-
-	print("*.world file saved");
-
-	//and export the world
+	//and export the world (skip .world save — it's immediately deleted by the pipeline)
 	wp.exportWorld(world)
 		.toDirectory(path + 'wpscript/exports')
 		.go();
