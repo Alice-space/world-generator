@@ -156,10 +156,33 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
         "False",
         "False",
     ]
-    result = subprocess.run(args, capture_output=True, text=True, cwd=str(scripts_folder))
-    logger.info("WorldPainter for %s output: %s", tile, result.stdout.strip())
-    if result.stderr.strip():
-        logger.error("WorldPainter for %s error: %s", tile, result.stderr.strip())
+    # Redirect wpscript stdout/stderr to a per-tile log file instead of using
+    # capture_output=True.  PIPE-based capture can deadlock when the wpscript
+    # JVM writes several MB of log output (the OS pipe buffer fills up before
+    # Python's communicate() reader thread drains it, blocking the JVM).
+    wp_log_dir = scripts_folder / "wpscript" / "logs"
+    wp_log_dir.mkdir(parents=True, exist_ok=True)
+    wp_out_path = wp_log_dir / f"{tile}.log"
+    with open(wp_out_path, "w") as wp_log:
+        result = subprocess.run(
+            args,
+            stdout=wp_log,
+            stderr=subprocess.STDOUT,
+            cwd=str(scripts_folder),
+        )
+    if result.returncode != 0:
+        try:
+            tail = wp_out_path.read_text().splitlines()[-20:]
+            logger.error(
+                "WorldPainter for %s FAILED (exit %d):\n%s",
+                tile,
+                result.returncode,
+                "\n".join(tail),
+            )
+        except Exception:
+            logger.error(
+                "WorldPainter for %s FAILED (exit %d)", tile, result.returncode
+            )
 
     # ---- Incremental cleanup: merge exports → final world, delete intermediates ----
     _merge_and_cleanup(config, tile, exports_folder, world_file, done_marker)
