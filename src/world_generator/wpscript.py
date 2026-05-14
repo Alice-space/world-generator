@@ -129,6 +129,22 @@ def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
         return False
 
 
+def _tile_has_images(config: GeneratorConfig, tile: str) -> bool:
+    """Return True if *tile* has enough QGIS image exports for WorldPainter.
+
+    A complete tile has ~72 files.  Failed QGIS strips produce directories with
+    fewer than 30 files — these tiles cannot be processed and must be skipped.
+    """
+    tile_dir = config.image_exports_dir / tile
+    if not tile_dir.is_dir():
+        return False
+    try:
+        count = sum(1 for _ in tile_dir.iterdir())
+        return count >= 30
+    except OSError:
+        return False
+
+
 def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     """Run WorldPainter for a single tile, then merge to final world and clean up.
 
@@ -148,6 +164,11 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     done_marker = final_region / f".tile_{tile}.done"
     if done_marker.exists():
         logger.info("Skipping WorldPainter for %s (already merged)", tile)
+        return
+
+    # Skip tiles with incomplete QGIS image exports (failed strips)
+    if not _tile_has_images(config, tile):
+        logger.warning("Skipping %s: image_exports missing or incomplete", tile)
         return
 
     # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles
