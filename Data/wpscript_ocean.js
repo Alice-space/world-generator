@@ -1,7 +1,8 @@
 "use strict";
 // Ocean-only variant of wpscript.js — skips terrain, landuse, roads, biomes,
 // ores, caves, and all land-specific processing.  Only loads water-related
-// sections, reducing per-tile time from ~60s to ~10s for pure-ocean tiles.
+// sections plus their required dependencies (custom_biomes for BIOME_RIVER,
+// filters for noWaterFilter/noWaterFilterForRivers).
 // Created for world-generator ocean fast path.
 
 var GLOBAL_CONTEXT = Function("return this;")();
@@ -69,16 +70,20 @@ load("utils.js");
 load("sections/lib/utils.js");
 
 // Minimal section sequence for ocean-only tiles.
-// Skipped vs full wpscript.js: custom_biomes, filters, climate, terrain,
-// vegetation, steep_mountains, volcano, landuse, borders,
-// water_depth_adjustments, mixed_layer_cleanup, deepwater_cleanup,
-// roads, vanilla_ores, caves, additional_ores, populate_layers.
+// custom_biomes and filters are still needed by water.js for
+// BIOME_RIVER, noWaterFilter, noWaterFilterForRivers.
+// Skipped vs full wpscript.js: climate, terrain, vegetation,
+// steep_mountains, volcano, landuse, borders, water_depth_adjustments,
+// mixed_layer_cleanup, deepwater_cleanup, roads, vanilla_ores,
+// caves, additional_ores, populate_layers.
 var SECTION_SEQUENCE = [
 	"shift",
 	"variables",
 	"layers",
 	"heightmap",
 	"terrain_import",
+	"custom_biomes",
+	"filters",
 	"water",
 	"export"
 ];
