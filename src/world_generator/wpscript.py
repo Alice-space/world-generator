@@ -6,6 +6,7 @@ import logging
 import multiprocessing as mp
 import os
 import queue
+import shutil
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -42,19 +43,16 @@ def _run_minutor(config: GeneratorConfig, tile: str, exports_folder) -> None:
 
 
 def run_world_painter(config: GeneratorConfig, tile: str) -> None:
-    """Run WorldPainter for a single tile, then trigger minutor asynchronously.
+    """Run WorldPainter for a single tile, then merge to final world and clean up.
 
-    WorldPainter (wpscript) carries ~5-10 s JVM cold-start cost per invocation.
-    Because each tile uses a fully independent world object and many global JS
-    variables that are set from positional CLI arguments, batching multiple tiles
-    into one JVM session would require substantial JS refactoring with a high risk
-    of correctness regressions.  Instead, parallelism is achieved at the Python
-    level: ``wp_generate`` launches up to ``wp_parallel_workers`` concurrent
-    wpscript processes (configurable, default 2).
+    After wpscript exports the tile as .mca region files, this function immediately:
+    1. Moves .mca files to the final Minecraft world (incremental merge)
+    2. Deletes the tile's intermediate exports directory
+    3. Deletes the .world file (no longer needed after export)
+    4. Cleans up image_exports for this tile to free disk space
 
-    Minutor preview rendering is decoupled from the wpscript step: after wpscript
-    finishes this function submits a non-blocking minutor job to a shared
-    ThreadPoolExecutor so that it does not delay the next wpscript invocation.
+    A per-tile sentinel file (``.tile_<TILE>.done``) in the final region dir
+    marks completion so that re-runs skip already-processed tiles.
     """
     logger.info("WorldPainter for %s", tile)
     scripts_folder = config.scripts_folder_path
@@ -64,9 +62,19 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     world_file = scripts_folder / "wpscript" / "worldpainter_files" / f"{tile}.world"
     world_file.parent.mkdir(parents=True, exist_ok=True)
     exports_folder.parent.mkdir(parents=True, exist_ok=True)
-    if world_file.exists():
-        logger.info("Skipping WorldPainter for %s", tile)
+
+    # Sentinel file in final world marks completed tiles
+    final_region = config.world_output_dir / "region"
+    done_marker = final_region / f".tile_{tile}.done"
+    if done_marker.exists():
+        logger.info("Skipping WorldPainter for %s (already merged)", tile)
         return
+
+    # If .world file exists but exports were never merged (no done marker),
+    # the previous attempt failed — clean up stale .world and retry.
+    if world_file.exists():
+        logger.info("Stale .world file for %s, removing and retrying", tile)
+        world_file.unlink()
 
     args = [
         "wpscript",
@@ -121,6 +129,78 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     # worker process can return immediately and the pool can start the next tile.
     _MINUTOR_EXECUTOR.submit(_run_minutor, config, tile, exports_folder)
 
+    # ---- Incremental cleanup: merge exports → final world, delete intermediates ----
+    _merge_and_cleanup(config, tile, exports_folder, world_file, done_marker)
+
+
+def _merge_and_cleanup(
+    config: GeneratorConfig,
+    tile: str,
+    exports_folder: Path,
+    world_file: Path,
+    done_marker: Path,
+) -> None:
+    """Move .mca exports to final world and delete all intermediate files for *tile*.
+
+    This is the key space-saving step: instead of keeping per-tile exports on disk
+    until a batch ``post_process_map``, each tile's .mca files are moved into the
+    final ``region/`` directory immediately after WorldPainter finishes.  Then all
+    intermediate artifacts (.world, raw QGIS PNGs) are deleted.
+    """
+    final_region = config.world_output_dir / "region"
+    final_region.mkdir(parents=True, exist_ok=True)
+
+    # Move .mca region files to final world
+    region_dir = exports_folder / "region"
+    moved = 0
+    if region_dir.is_dir():
+        for mca_file in region_dir.iterdir():
+            if mca_file.is_file():
+                try:
+                    dest = final_region / mca_file.name
+                    shutil.move(str(mca_file), str(dest))
+                    moved += 1
+                except OSError as exc:
+                    logger.warning(
+                        "Failed to move %s → %s: %s", mca_file, dest, exc
+                    )
+        try:
+            shutil.rmtree(str(exports_folder))
+        except OSError as exc:
+            logger.warning("Failed to remove exports dir %s: %s", exports_folder, exc)
+    logger.info("Tile %s: merged %d .mca files into final world", tile, moved)
+
+    # Delete .world file after successful export
+    try:
+        world_file.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning("Failed to remove .world file %s: %s", world_file, exc)
+
+    # Delete image_exports for this tile to reclaim disk space
+    tile_img_dir = config.image_exports_dir / tile
+    if tile_img_dir.exists():
+        try:
+            shutil.rmtree(str(tile_img_dir))
+            logger.debug("Cleaned up image_exports for %s", tile)
+        except OSError as exc:
+            logger.warning("Failed to remove image_exports for %s: %s", tile, exc)
+
+    # Write sentinel marker so re-runs skip this tile
+    try:
+        done_marker.touch()
+    except OSError as exc:
+        logger.warning("Failed to write done marker for %s: %s", tile, exc)
+
+
+def _drain_stderr(proc: subprocess.Popen, prefix: str) -> None:
+    """Read stderr lines in a background thread to prevent pipe buffer deadlock."""
+    try:
+        for line in proc.stderr:
+            if line.strip():
+                logger.debug("%s stderr: %s", prefix, line.rstrip())
+    except Exception:
+        pass  # pipe closed during shutdown
+
 
 # Module-level thread pool shared across all worker processes forked by pebble.
 # ThreadPoolExecutor is safe to use after fork (each child process gets its own
@@ -158,6 +238,15 @@ class WPDaemon:
             text=True,
             bufsize=1,  # line-buffered
         )
+        # Drain stderr in a background thread to prevent pipe-buffer deadlock.
+        # Without this, if the JVM writes enough stderr output the pipe fills up
+        # and the subprocess blocks on write, hanging the daemon.
+        self._stderr_thread = threading.Thread(
+            target=_drain_stderr,
+            args=[self._proc, f"WPDaemon-{self.worker_id}"],
+            daemon=True,
+        )
+        self._stderr_thread.start()
         ready_line = self._proc.stdout.readline()
         if not ready_line:
             stderr_out = self._proc.stderr.read()
@@ -334,6 +423,14 @@ class WPDaemonPool:
                 daemon.start()
             self._available.put(daemon)
 
+        # Incremental cleanup after successful export
+        scripts_folder = self.config.scripts_folder_path
+        exports_folder = scripts_folder / "wpscript" / "exports" / tile
+        world_file = scripts_folder / "wpscript" / "worldpainter_files" / f"{tile}.world"
+        final_region = self.config.world_output_dir / "region"
+        done_marker = final_region / f".tile_{tile}.done"
+        _merge_and_cleanup(self.config, tile, exports_folder, world_file, done_marker)
+
     def shutdown(self) -> None:
         """Shut down all daemon workers."""
         for d in self._daemons:
@@ -348,6 +445,9 @@ class WPDaemonPool:
 
 def _wp_generate_daemon(config: GeneratorConfig) -> None:
     """Generate all tiles using the persistent daemon pool."""
+    final_region = config.world_output_dir / "region"
+    final_region.mkdir(parents=True, exist_ok=True)
+
     pool = WPDaemonPool(config)
     pool.start()
     try:
@@ -357,14 +457,8 @@ def _wp_generate_daemon(config: GeneratorConfig) -> None:
             for x_min in range(-180, 180, degree):
                 for y_min in range(-90, 90, degree):
                     tile = calculateTiles(x_min, y_min + degree)
-                    # Skip if .world already exists
-                    world_file = (
-                        config.scripts_folder_path
-                        / "wpscript"
-                        / "worldpainter_files"
-                        / f"{tile}.world"
-                    )
-                    if world_file.exists():
+                    done_marker = final_region / f".tile_{tile}.done"
+                    if done_marker.exists():
                         continue
                     dir_lat = tile[0:1]
                     lat = int(tile[1:3])
@@ -380,34 +474,82 @@ def _wp_generate_daemon(config: GeneratorConfig) -> None:
     finally:
         pool.shutdown()
 
+    logger.info("Daemon WorldPainter jobs done; waiting for minutor renders")
+    _MINUTOR_EXECUTOR.shutdown(wait=True, cancel_futures=False)
+    logger.info("All WorldPainter + minutor jobs completed")
+
 
 def _wp_generate_legacy(config: GeneratorConfig) -> None:
-    """Schedule all WorldPainter tile jobs using the legacy pebble ProcessPool.
+    """Schedule all WorldPainter tile jobs using ``multiprocessing.Pool``.
 
     Uses ``config.wp_parallel_workers`` (default 2) as the pool size, keeping
     WP concurrency independent of the ``threads`` setting used by QGIS and
     ImageMagick stages.  Each JVM instance typically requires 4-6 GB RAM, so
     the default is conservative; increase ``wp_parallel_workers`` if sufficient
     memory is available.
+
+    Tiles already merged into the final world (detected via ``.tile_<TILE>.done``
+    sentinel) are skipped so that the pipeline can be safely re-run.
     """
     degree_per_tile = config.degree_per_tile
     workers = config.wp_parallel_workers
     logger.info(
         "Starting WorldPainter stage (legacy mode) with wp_parallel_workers=%d", workers
     )
-    pool = pebble.ProcessPool(
-        max_workers=workers,
-        max_tasks=1,
-        context=mp.get_context("forkserver"),
-    )
+    final_region = config.world_output_dir / "region"
+    final_region.mkdir(parents=True, exist_ok=True)
+
+    # Build list of pending tiles
+    pending_tiles: list[str] = []
     for x_min in range(-180, 180, degree_per_tile):
         for y_min in range(-90, 90, degree_per_tile):
             tile = calculateTiles(x_min, y_min + degree_per_tile)
-            pool.schedule(run_world_painter, [config, tile])
-    pool.close()
-    pool.join()
+            done_marker = final_region / f".tile_{tile}.done"
+            if not done_marker.exists():
+                pending_tiles.append(tile)
 
-    # Wait for all pending minutor renders to finish before returning.
+    logger.info(
+        "WP legacy: %d tiles pending, %d already done",
+        len(pending_tiles),
+        360 * 180 // (degree_per_tile * degree_per_tile) - len(pending_tiles),
+    )
+
+    if not pending_tiles:
+        logger.info("No pending tiles; WorldPainter stage complete")
+        return
+
+    ctx = mp.get_context("fork")
+    with ctx.Pool(processes=workers, maxtasksperchild=1) as pool:
+        async_results = [
+            (tile, pool.apply_async(run_world_painter, (config, tile)))
+            for tile in pending_tiles
+        ]
+
+        failures: list[tuple[str, str]] = []
+        for tile, ar in async_results:
+            try:
+                ar.get(timeout=3600)  # 1-hour timeout per tile
+            except Exception as exc:
+                failures.append((tile, str(exc)))
+                logger.error("Tile %s failed: %s", tile, exc)
+
+    if failures:
+        logger.error("WP legacy: %d / %d tiles failed", len(failures), len(pending_tiles))
+        for tile, err in failures[:20]:
+            logger.error("  %s: %s", tile, err)
+        try:
+            failure_log = config.scripts_folder_path / "wp_failures.txt"
+            with failure_log.open("a") as fh:
+                for tile, err in failures:
+                    fh.write(f"tile={tile} err={err}\n")
+        except Exception as exc:
+            logger.warning("Could not write WP failure log: %s", exc)
+    logger.info(
+        "Legacy WP done: %d ok, %d failed",
+        len(pending_tiles) - len(failures),
+        len(failures),
+    )
+
     logger.info("WorldPainter jobs done; waiting for minutor renders to finish")
     _MINUTOR_EXECUTOR.shutdown(wait=True, cancel_futures=False)
     logger.info("All WorldPainter + minutor jobs completed")

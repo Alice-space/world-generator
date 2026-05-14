@@ -72,23 +72,42 @@ def copy_osm_files(config: GeneratorConfig) -> None:
 
 
 def post_process_map(config: GeneratorConfig) -> None:
-    logger.info("Merging exported regions")
-    final_path = config.world_output_dir
-    final_path.mkdir(parents=True, exist_ok=True)
-    final_region_path = final_path / "region"
+    """Safety-net merge for any leftover per-tile exports + final Minutor overview.
+
+    In normal operation each tile is merged incrementally by ``run_world_painter``
+    or ``WPDaemonPool.process_tile``.  This function handles any stragglers that
+    may have been missed (e.g. worker crash between export and cleanup).
+    """
+    logger.info("Safety-net merge: checking for leftover exports")
+    final_region_path = config.world_output_dir / "region"
     final_region_path.mkdir(parents=True, exist_ok=True)
 
     wp_export_folder = config.scripts_folder_path / "wpscript" / "exports"
+    straggler_count = 0
 
     for tile_folder in wp_export_folder.iterdir():
         region_dir = tile_folder / "region"
-        if not region_dir.exists():
+        if not region_dir.is_dir():
             continue
-        for file in region_dir.iterdir():
-            shutil.copy2(file, final_region_path / file.name)
-    logger.info("Region merge complete")
+        for mca_file in region_dir.iterdir():
+            if mca_file.is_file():
+                dest = final_region_path / mca_file.name
+                try:
+                    shutil.move(str(mca_file), str(dest))
+                except OSError:
+                    shutil.copy2(mca_file, dest)
+                straggler_count += 1
+        try:
+            shutil.rmtree(str(tile_folder))
+        except OSError:
+            pass
+    if straggler_count:
+        logger.info("Safety-net merge: %d straggler .mca files moved", straggler_count)
+    else:
+        logger.info("No leftover exports found (all tiles cleaned up incrementally)")
 
     logger.info("Running minutor overview")
+    final_path = config.world_output_dir
     output_png = config.scripts_folder_path / f"{config.world_name}.png"
     result = subprocess.run(
         [

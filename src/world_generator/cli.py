@@ -7,13 +7,14 @@ from typing import Sequence
 
 from .config import load_config
 from .pipeline import WorldGenerationPipeline
+from .wpscript import wp_generate
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Minecraft world generator")
     parser.add_argument(
         "command",
-        choices=("run", "preprocess", "tiles"),
+        choices=("run", "preprocess", "tiles", "worldpainter"),
         nargs="?",
         default="run",
         help="Pipeline stage to run",
@@ -69,6 +70,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         pipeline.preprocess()
     elif args.command == "tiles":
         pipeline.generate_tiles()
+    elif args.command == "worldpainter":
+        wp_generate(config)
     else:
         pipeline.run_all()
     return 0
