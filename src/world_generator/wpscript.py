@@ -183,6 +183,7 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
             logger.error(
                 "WorldPainter for %s FAILED (exit %d)", tile, result.returncode
             )
+        return
 
     # ---- Incremental cleanup: merge exports → final world, delete intermediates ----
     _merge_and_cleanup(config, tile, exports_folder, world_file, done_marker)
@@ -540,13 +541,13 @@ def _wp_generate_daemon(config: GeneratorConfig) -> None:
 
 
 def _wp_generate_legacy(config: GeneratorConfig) -> None:
-    """Schedule all WorldPainter tile jobs using ``multiprocessing.Pool``.
+    """Schedule all WorldPainter tile jobs using ``ThreadPoolExecutor``.
 
-    Uses ``config.wp_parallel_workers`` (default 2) as the pool size, keeping
-    WP concurrency independent of the ``threads`` setting used by QGIS and
-    ImageMagick stages.  Each JVM instance typically requires 4-6 GB RAM, so
-    the default is conservative; increase ``wp_parallel_workers`` if sufficient
-    memory is available.
+    Uses ``config.wp_parallel_workers`` as the pool size.  Threads (not processes)
+    are used because the heavy work is in external wpscript JVM subprocesses
+    (``subprocess.run``), which release the GIL.  This avoids the fork overhead
+    and reliability issues of ``multiprocessing.Pool`` with ``maxtasksperchild=1``
+    when handling 55k+ tiles.
 
     Tiles already merged into the final world (detected via ``.tile_<TILE>.done``
     sentinel) are skipped so that the pipeline can be safely re-run.
@@ -568,33 +569,50 @@ def _wp_generate_legacy(config: GeneratorConfig) -> None:
             if not done_marker.exists():
                 pending_tiles.append(tile)
 
+    total_tiles = 360 * 180 // (degree_per_tile * degree_per_tile)
+    done_count = total_tiles - len(pending_tiles)
     logger.info(
         "WP legacy: %d tiles pending, %d already done",
         len(pending_tiles),
-        360 * 180 // (degree_per_tile * degree_per_tile) - len(pending_tiles),
+        done_count,
     )
 
     if not pending_tiles:
         logger.info("No pending tiles; WorldPainter stage complete")
         return
 
-    ctx = mp.get_context("fork")
-    with ctx.Pool(processes=workers, maxtasksperchild=1) as pool:
-        async_results = [
-            (tile, pool.apply_async(run_world_painter, (config, tile)))
-            for tile in pending_tiles
-        ]
+    failures: list[tuple[str, str]] = []
+    completed: int = 0
+    progress_interval: int = max(1, len(pending_tiles) // 200)  # log ~200 times
 
-        failures: list[tuple[str, str]] = []
-        for tile, ar in async_results:
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_tile = {
+            executor.submit(run_world_painter, config, tile): tile
+            for tile in pending_tiles
+        }
+
+        for future in as_completed(future_to_tile):
+            tile = future_to_tile[future]
             try:
-                ar.get(timeout=3600)  # 1-hour timeout per tile
+                future.result(timeout=3600)
+                completed += 1
+                if completed % progress_interval == 0:
+                    pct = completed * 100.0 / len(pending_tiles)
+                    logger.info(
+                        "WP progress: %d/%d tiles (%.1f%%), %d failures so far",
+                        completed + done_count,
+                        total_tiles,
+                        (completed + done_count) * 100.0 / total_tiles,
+                        len(failures),
+                    )
             except Exception as exc:
                 failures.append((tile, str(exc)))
                 logger.error("Tile %s failed: %s", tile, exc)
 
     if failures:
-        logger.error("WP legacy: %d / %d tiles failed", len(failures), len(pending_tiles))
+        logger.error(
+            "WP legacy: %d / %d tiles failed", len(failures), len(pending_tiles)
+        )
         for tile, err in failures[:20]:
             logger.error("  %s: %s", tile, err)
         try:
@@ -604,6 +622,7 @@ def _wp_generate_legacy(config: GeneratorConfig) -> None:
                     fh.write(f"tile={tile} err={err}\n")
         except Exception as exc:
             logger.warning("Could not write WP failure log: %s", exc)
+
     logger.info(
         "Legacy WP done: %d ok, %d failed",
         len(pending_tiles) - len(failures),
