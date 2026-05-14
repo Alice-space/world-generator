@@ -171,7 +171,7 @@ function buildScriptArguments(stArgs, msg) {
 	// 29:settingsLowerBuildLimit, 30:settingsUpperBuildLimit,
 	// 31:settingsVanillaPopulation, 32:heightmapName, 33:biomeSource,
 	// 34:oreModifier, 35..39:mod_*
-	var a = java.lang.reflect.Array.newInstance(java.lang.Object, 40);
+	var a = java.lang.reflect.Array.newInstance(java.lang.Object.class, 40);
 	a[0]  = stArgs.path;
 	a[1]  = String(msg.dir_lat);
 	a[2]  = parseInt(msg.lat, 10);
