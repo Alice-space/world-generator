@@ -88,15 +88,9 @@ if (longitute > 99) {
 // Load climateImage directly (water.js needs it for mangrove logic).
 // We skip the 2336-line climate.js which does full biome mapping —
 // we only need the heightmap image loaded for water.js reference checks.
-var _climatePath = path + "image_exports/" + tile + "/" + tile + "_climate.png";
-print("ocean: loading climate from " + _climatePath);
-try {
-	var climateImage = wp.getHeightMap().fromFile(_climatePath).go();
-	print("ocean: climateImage loaded OK, type=" + typeof climateImage);
-} catch (e) {
-	print("ocean: ERROR loading climateImage: " + e);
-	throw e;
-}
+var climateImage = wp.getHeightMap().fromFile(
+	path + "image_exports/" + tile + "/" + tile + "_climate.png"
+).go();
 
 // Minimal section sequence for ocean-only tiles.
 // climateImage is loaded above (just the PNG, no biome mapping).
