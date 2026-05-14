@@ -150,11 +150,14 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
         logger.info("Skipping WorldPainter for %s (already merged)", tile)
         return
 
-    # TODO: re-enable ocean fast path once wpscript_ocean.js dependency issue
-    # is resolved. Currently wpscript_ocean.js causes ClassCastException at load
-    # time because water.js references symbols from skipped sections.
-    script_js = scripts_folder / "wpscript.js"
-    logger.info("WorldPainter for %s", tile)
+    # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles
+    ocean = _is_ocean_tile(config, tile)
+    if ocean:
+        script_js = scripts_folder / "wpscript_ocean.js"
+        logger.info("WorldPainter for %s (ocean fast path)", tile)
+    else:
+        script_js = scripts_folder / "wpscript.js"
+        logger.info("WorldPainter for %s", tile)
 
     exports_folder = scripts_folder / "wpscript" / "exports" / tile
     world_file = scripts_folder / "wpscript" / "worldpainter_files" / f"{tile}.world"
