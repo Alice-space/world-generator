@@ -241,15 +241,11 @@ function runTileEngine(msg) {
 		// no script arguments by default).
 		engine.put("arguments", buildScriptArguments(staticArgs, msg));
 
-		// Evaluate wpscript.js via FileReader so it runs inside the child engine
-		// scope. The script's own load("sections/...") calls will resolve
-		// relative to the now-set user.dir = staticArgs.path.
-		var reader = new java.io.FileReader(staticArgs.path + "/wpscript.js");
-		try {
-			engine.eval(reader);
-		} finally {
-			reader.close();
-		}
+		// Use load() instead of engine.eval(Reader) so that Nashorn
+		// records the source-file URL.  This enables wpscript.js
+		// nested load("utils.js") and load("sections/...") calls to
+		// resolve relative to the script directory.
+		engine.eval("load('" + staticArgs.path + "/wpscript.js')");
 	} finally {
 		// Always restore user.dir even if tile fails
 		java.lang.System.setProperty("user.dir", origCwd);
