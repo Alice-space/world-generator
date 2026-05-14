@@ -20,9 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 def _run_minutor(config: GeneratorConfig, tile: str, exports_folder) -> None:
-    """Render a per-tile PNG preview with minutor (non-blocking helper)."""
+    """Render a per-tile PNG preview with minutor (non-blocking helper).
+
+    Uses QT_QPA_PLATFORM=offscreen so that minutor works inside worker processes
+    that may not have access to an X display (e.g. multiprocessing.Pool workers).
+    """
+    if not exports_folder.exists():
+        logger.debug("Skipping minutor for %s: exports folder gone (already merged)", tile)
+        return
     minutor_png = config.scripts_folder_path / "render" / f"{tile}.png"
     (config.scripts_folder_path / "render").mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.setdefault("QT_QPA_PLATFORM", "offscreen")
     render_result = subprocess.run(
         [
             "minutor",
@@ -35,11 +44,38 @@ def _run_minutor(config: GeneratorConfig, tile: str, exports_folder) -> None:
         ],
         capture_output=True,
         text=True,
+        env=env,
     )
     if render_result.stdout.strip():
         logger.info("minutor for %s output: %s", tile, render_result.stdout.strip())
     if render_result.stderr.strip():
         logger.error("minutor for %s error: %s", tile, render_result.stderr.strip())
+
+
+def _run_minutor_world(config: GeneratorConfig, tile: str) -> None:
+    """Render minutor preview from the final merged world (after tile cleanup)."""
+    minutor_png = config.scripts_folder_path / "render" / f"{tile}.png"
+    (config.scripts_folder_path / "render").mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.setdefault("QT_QPA_PLATFORM", "offscreen")
+    render_result = subprocess.run(
+        [
+            "minutor",
+            "--world",
+            str(config.world_output_dir),
+            "--depth",
+            str(config.minutor_depth),
+            "--savepng",
+            str(minutor_png),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    if render_result.stdout.strip():
+        logger.debug("minutor for %s output: %s", tile, render_result.stdout.strip())
+    if render_result.stderr.strip():
+        logger.warning("minutor for %s error: %s", tile, render_result.stderr.strip())
 
 
 def run_world_painter(config: GeneratorConfig, tile: str) -> None:
@@ -125,12 +161,13 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     if result.stderr.strip():
         logger.error("WorldPainter for %s error: %s", tile, result.stderr.strip())
 
-    # Minutor preview is submitted to the module-level thread pool so that this
-    # worker process can return immediately and the pool can start the next tile.
-    _MINUTOR_EXECUTOR.submit(_run_minutor, config, tile, exports_folder)
-
     # ---- Incremental cleanup: merge exports → final world, delete intermediates ----
     _merge_and_cleanup(config, tile, exports_folder, world_file, done_marker)
+
+    # Minutor preview AFTER cleanup — at this point exports_folder is gone (merged),
+    # so render from the final world instead. Uses QT_QPA_PLATFORM=offscreen to
+    # work without an X display in worker subprocesses.
+    _MINUTOR_EXECUTOR.submit(_run_minutor_world, config, tile)
 
 
 def _merge_and_cleanup(
