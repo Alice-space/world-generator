@@ -154,7 +154,69 @@ function injectGlobals(engine, stArgs, msg) {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Helper: evaluate wpscript.js inside a child engine
+// 5. Build the full arguments array matching wpscript.js STARTUP_ARGUMENTS.
+//    wpscript.js wraps startup as (function(args){...})(arguments), and in a
+//    child Nashorn engine created via engine.eval(Reader), `arguments` is
+//    empty — causing the IIFE to overwrite every injected global with undefined.
+//    We pre-seed `arguments` with the correct values so the IIFE reconstructs
+//    the same global environment that a bare `wpscript script.js <args...>`
+//    invocation would provide.
+// ---------------------------------------------------------------------------
+
+function buildScriptArguments(stArgs, msg) {
+	// Must match STARTUP_ARGUMENTS order in wpscript.js exactly:
+	// 0:path, 1:directionLatitude, 2:latitude, 3:directionLongitute, 4:longitute,
+	// 5:scale, 6:tilesPerMap, 7:verticalScale,
+	// 8..26:settings*, 27:settingsMapVersion, 28:settingsMapOffset,
+	// 29:settingsLowerBuildLimit, 30:settingsUpperBuildLimit,
+	// 31:settingsVanillaPopulation, 32:heightmapName, 33:biomeSource,
+	// 34:oreModifier, 35..39:mod_*
+	var a = java.lang.reflect.Array.newInstance(java.lang.Object, 40);
+	a[0]  = stArgs.path;
+	a[1]  = String(msg.dir_lat);
+	a[2]  = parseInt(msg.lat, 10);
+	a[3]  = String(msg.dir_lon);
+	a[4]  = parseInt(msg.lon, 10);
+	a[5]  = stArgs.scale;
+	a[6]  = stArgs.tilesPerMap;
+	a[7]  = stArgs.verticalScale;
+	a[8]  = stArgs.settingsBorders;
+	a[9]  = stArgs.settingsStateBorders;
+	a[10] = stArgs.settingsHighways;
+	a[11] = stArgs.settingsStreets;
+	a[12] = stArgs.settingsSmallStreets;
+	a[13] = stArgs.settingsBuildings;
+	a[14] = stArgs.settingsOres;
+	a[15] = stArgs.settingsNetherite;
+	a[16] = stArgs.settingsFarms;
+	a[17] = stArgs.settingsMeadows;
+	a[18] = stArgs.settingsQuarrys;
+	a[19] = stArgs.settingsAerodrome;
+	a[20] = stArgs.settingsMobSpawner;
+	a[21] = stArgs.settingsAnimalSpawner;
+	a[22] = stArgs.settingsRivers;
+	a[23] = stArgs.settingsStreams;
+	a[24] = stArgs.settingsVolcanos;
+	a[25] = stArgs.settingsShrubs;
+	a[26] = stArgs.settingsCrops;
+	a[27] = stArgs.settingsMapVersion;
+	a[28] = stArgs.settingsMapOffset;
+	a[29] = stArgs.settingsLowerBuildLimit;
+	a[30] = stArgs.settingsUpperBuildLimit;
+	a[31] = stArgs.settingsVanillaPopulation;
+	a[32] = String(msg.tile);       // heightmapName
+	a[33] = stArgs.biomeSource;
+	a[34] = stArgs.oreModifier;
+	a[35] = stArgs.mod_BOP;
+	a[36] = stArgs.mod_BYG;
+	a[37] = stArgs.mod_Terralith;
+	a[38] = stArgs.mod_williamWythers;
+	a[39] = stArgs.mod_Create;
+	return a;
+}
+
+// ---------------------------------------------------------------------------
+// 6. Helper: evaluate wpscript.js inside a child engine
 //    The existing wpscript.js calls load("utils.js") and
 //    load("sections/lib/utils.js") with paths relative to the Data/ dir.
 //    Nashorn resolves load() paths relative to user.dir, so we temporarily
@@ -173,6 +235,12 @@ function runTileEngine(msg) {
 	try {
 		injectGlobals(engine, staticArgs, msg);
 
+		// Seed `arguments` so wpscript.js's IIFE (function(args){...})(arguments)
+		// receives the full startup-argument array.  Without this the IIFE
+		// overwrites every injected global with undefined (child engines have
+		// no script arguments by default).
+		engine.put("arguments", buildScriptArguments(staticArgs, msg));
+
 		// Evaluate wpscript.js via FileReader so it runs inside the child engine
 		// scope. The script's own load("sections/...") calls will resolve
 		// relative to the now-set user.dir = staticArgs.path.
@@ -189,7 +257,7 @@ function runTileEngine(msg) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Main loop
+// 7. Main loop
 // ---------------------------------------------------------------------------
 
 stdout.println(JSON.stringify({ status: "ready" }));
