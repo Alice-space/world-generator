@@ -268,9 +268,10 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     _merge_and_cleanup(config, tile, exports_folder, world_file, done_marker)
 
     # Minutor preview AFTER cleanup — at this point exports_folder is gone (merged),
-    # so render from the final world instead. Uses QT_QPA_PLATFORM=offscreen to
-    # work without an X display in worker subprocesses.
-    _MINUTOR_EXECUTOR.submit(_run_minutor_world, config, tile)
+    # Minutor preview disabled — each render uses 100% CPU for hours at depth 319,
+    # and the preview PNGs are not essential for map generation.  Minutor processes
+    # from previous runs had to be killed manually after accumulating to ~760% CPU.
+    # _MINUTOR_EXECUTOR.submit(_run_minutor_world, config, tile)
 
 
 def _merge_and_cleanup(
