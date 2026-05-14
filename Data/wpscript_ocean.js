@@ -69,6 +69,22 @@ var STARTUP_ARGUMENTS = [
 load("utils.js");
 load("sections/lib/utils.js");
 
+// Construct tile name (normally done by shift.js, but we need it before
+// loading climateImage for the ocean fast path).
+var tile = "";
+if (latitude > 9) {
+	tile = tile.concat(directionLatitude + latitude);
+} else {
+	tile = tile.concat(directionLatitude + "0" + latitude);
+}
+if (longitute > 99) {
+	tile = tile.concat(directionLongitute + longitute);
+} else if (longitute > 9) {
+	tile = tile.concat(directionLongitute + "0" + longitute);
+} else {
+	tile = tile.concat(directionLongitute + "00" + longitute);
+}
+
 // Load climateImage directly (water.js needs it for mangrove logic).
 // We skip the 2336-line climate.js which does full biome mapping —
 // we only need the heightmap image loaded for water.js reference checks.
@@ -80,6 +96,7 @@ var climateImage = wp.getHeightMap().fromFile(
 // climateImage is loaded above (just the PNG, no biome mapping).
 // custom_biomes provides BIOME_RIVER/BIOME_MANGROVE_SWAMP.
 // filters provides noWaterFilter/noWaterFilterForRivers/swampFilterBelowDegrees.
+// shift.js re-defines tile (idempotent — same result as above).
 // Skipped vs full wpscript.js: climate (full 2336 lines), terrain, vegetation,
 // steep_mountains, volcano, landuse, borders, water_depth_adjustments,
 // mixed_layer_cleanup, deepwater_cleanup, roads, vanilla_ores,
