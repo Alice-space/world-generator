@@ -109,23 +109,31 @@ def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
     """Check whether *tile* is a pure-ocean tile.
 
     Uses the pre-scanned cache (``ocean_tiles.txt``) for O(1) lookups.  Falls
-    back to counting unique colours in the QGIS climate export with ImageMagick
+    back to checking water coverage with ImageMagick (water.png mean > 0.95)
     if the cache is not yet available.
+
+    Note: we check water.png mean, not climate.png unique colours.  Uniform
+    land climates (plains, desert) can have 1-colour climate.png and would be
+    incorrectly classified as ocean — water coverage directly measures how much
+    of the tile is water.
     """
     cache = _load_ocean_tile_cache(config)
     if cache:
         return tile in cache
-    # Slow path: inline identify call (0.4s)
-    climate_png = config.image_exports_dir / tile / f"{tile}_climate.png"
-    if not climate_png.is_file():
+    # Slow path: inline identify call (0.4s) — check water.png mean value
+    water_png = config.image_exports_dir / tile / f"{tile}_water.png"
+    if not water_png.is_file():
         return False
     try:
         result = subprocess.run(
-            ["identify", "-format", "%k", str(climate_png)],
+            ["identify", "-format", "%[fx:mean]", str(water_png)],
             capture_output=True, text=True, timeout=10,
         )
-        return result.returncode == 0 and result.stdout.strip() == "1"
-    except Exception:
+        if result.returncode == 0:
+            water_mean = float(result.stdout.strip())
+            return water_mean >= 0.95
+        return False
+    except (ValueError, Exception):
         return False
 
 
