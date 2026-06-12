@@ -139,6 +139,14 @@ class GeneratorConfig:
     # Keys are stripped of the "wp_app_" prefix before passing as CLI args.
     wp_app_settings: Mapping[str, Any] | None = None
 
+    # 最终世界输出目录覆盖项。未设置时沿用 scripts_folder_path/world_name。
+    # 设置后可将最终世界放到独立磁盘（如 14T 盘），与工作目录分离。
+    world_output_path: Path | None = None
+
+    # 合并完成后保留 image_exports（True 时不删除）。重新生成 QGIS 导出的
+    # 代价极高（需重跑 preprocess + QGIS 数小时到数天），默认保留。
+    keep_image_exports: bool = True
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -153,6 +161,8 @@ class GeneratorConfig:
 
     @property
     def world_output_dir(self) -> Path:
+        if self.world_output_path is not None:
+            return self.world_output_path
         return self.scripts_folder_path / self.world_name
 
     @property
@@ -323,6 +333,13 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         wp_max_tiles_per_worker=_get_int("wp_max_tiles_per_worker"),
         # WorldPainter Application Settings
         wp_app_settings=wp_app_settings or None,
+        # 输出位置与清理策略
+        world_output_path=(
+            _expand_path(str(raw["world_output_path"]))
+            if raw.get("world_output_path") is not None
+            else None
+        ),
+        keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
     )
 
 

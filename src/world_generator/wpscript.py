@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pebble
 
 from .config import GeneratorConfig
+from .regionmerge import merge_tile_region, sweep_tmp_files
 from .tools import calculateTiles
 
 logger = logging.getLogger(__name__)
@@ -80,47 +81,63 @@ def _run_minutor_world(config: GeneratorConfig, tile: str) -> None:
 
 # Module-level cache of pure-ocean tiles loaded from the pre-scan file.
 # Populated once on first access to speed up ocean tile checks from O(0.4s
-# identify call) to O(1) dict lookup.
+# identify call) to O(1) set lookup.  Misses fall back to identify and are
+# appended to the cache file so coverage grows across runs.
 _ocean_tile_cache: set[str] | None = None
+_ocean_cache_lock = threading.Lock()
 
 
 def _load_ocean_tile_cache(config: GeneratorConfig) -> set[str]:
     """Load the pre-scanned ocean tile list from disk (one tile name per line)."""
     global _ocean_tile_cache
-    if _ocean_tile_cache is not None:
-        return _ocean_tile_cache
-    cache_path = config.scripts_folder_path / "ocean_tiles.txt"
-    if cache_path.is_file():
-        try:
-            _ocean_tile_cache = set(
-                line.strip() for line in cache_path.read_text().splitlines()
-                if line.strip()
-            )
-            logger.info("Loaded %d ocean tiles from cache", len(_ocean_tile_cache))
-        except Exception as exc:
-            logger.warning("Failed to load ocean tile cache: %s", exc)
+    with _ocean_cache_lock:
+        if _ocean_tile_cache is not None:
+            return _ocean_tile_cache
+        cache_path = config.scripts_folder_path / "ocean_tiles.txt"
+        if cache_path.is_file():
+            try:
+                _ocean_tile_cache = set(
+                    line.strip() for line in cache_path.read_text().splitlines()
+                    if line.strip()
+                )
+                logger.info("Loaded %d ocean tiles from cache", len(_ocean_tile_cache))
+            except Exception as exc:
+                logger.warning("Failed to load ocean tile cache: %s", exc)
+                _ocean_tile_cache = set()
+        else:
             _ocean_tile_cache = set()
-    else:
-        _ocean_tile_cache = set()
-    return _ocean_tile_cache
+        return _ocean_tile_cache
+
+
+def _remember_ocean_tile(config: GeneratorConfig, tile: str) -> None:
+    """Add *tile* to the in-memory ocean cache and append it to the cache file."""
+    cache = _load_ocean_tile_cache(config)
+    with _ocean_cache_lock:
+        if tile in cache:
+            return
+        cache.add(tile)
+        try:
+            cache_path = config.scripts_folder_path / "ocean_tiles.txt"
+            with cache_path.open("a") as fh:
+                fh.write(tile + "\n")
+        except OSError as exc:
+            logger.warning("Could not append %s to ocean cache: %s", tile, exc)
 
 
 def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
     """Check whether *tile* is a pure-ocean tile.
 
-    Uses the pre-scanned cache (``ocean_tiles.txt``) for O(1) lookups.  Falls
-    back to checking water coverage with ImageMagick (water.png mean > 0.95)
-    if the cache is not yet available.
+    Cache hits (``ocean_tiles.txt``) are O(1).  Misses fall back to checking
+    water coverage with ImageMagick (water.png mean >= 0.95) and, when ocean,
+    are appended to the cache so subsequent runs skip the identify call.
 
     Note: we check water.png mean, not climate.png unique colours.  Uniform
     land climates (plains, desert) can have 1-colour climate.png and would be
     incorrectly classified as ocean — water coverage directly measures how much
     of the tile is water.
     """
-    cache = _load_ocean_tile_cache(config)
-    if cache:
-        return tile in cache
-    # Slow path: inline identify call (0.4s) — check water.png mean value
+    if tile in _load_ocean_tile_cache(config):
+        return True
     water_png = config.image_exports_dir / tile / f"{tile}_water.png"
     if not water_png.is_file():
         return False
@@ -129,9 +146,9 @@ def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
             ["identify", "-format", "%[fx:mean]", str(water_png)],
             capture_output=True, text=True, timeout=10,
         )
-        if result.returncode == 0:
-            water_mean = float(result.stdout.strip())
-            return water_mean >= 0.95
+        if result.returncode == 0 and float(result.stdout.strip()) >= 0.95:
+            _remember_ocean_tile(config, tile)
+            return True
         return False
     except (ValueError, Exception):
         return False
@@ -180,18 +197,12 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
         return
 
     # Ocean fast path: use minimal wpscript_ocean.js for pure-ocean tiles.
-    # Also incrementally build the ocean_tiles.txt cache so future pipeline runs
-    # can use O(1) lookups instead of 0.4s identify calls.
+    # _is_ocean_tile maintains the ocean_tiles.txt cache (cache hits are O(1),
+    # identify-detected ocean tiles are appended for future runs).
     ocean = _is_ocean_tile(config, tile)
     if ocean:
         script_js = scripts_folder / "wpscript_ocean.js"
         logger.info("WorldPainter for %s (ocean fast path)", tile)
-        try:
-            cache_path = scripts_folder / "ocean_tiles.txt"
-            with cache_path.open("a") as fh:
-                fh.write(tile + "\n")
-        except OSError:
-            pass
     else:
         script_js = scripts_folder / "wpscript.js"
         logger.info("WorldPainter for %s", tile)
@@ -290,6 +301,39 @@ def run_world_painter(config: GeneratorConfig, tile: str) -> None:
     # _MINUTOR_EXECUTOR.submit(_run_minutor_world, config, tile)
 
 
+# Guards one-time copy of world metadata (level.dat etc.) into the final world.
+_world_meta_lock = threading.Lock()
+
+
+def _seed_world_metadata(config: GeneratorConfig, export_root: Path) -> None:
+    """Copy level.dat (+ session.lock) from a tile export into the final world.
+
+    Every WorldPainter tile export is a complete world directory; the final
+    merged world only ever receives region files, so without this the world
+    cannot be opened by Minecraft or map tools.  First merged tile wins.
+    """
+    final = config.world_output_dir
+    if (final / "level.dat").exists():
+        return
+    with _world_meta_lock:
+        if (final / "level.dat").exists():
+            return
+        for name in ("session.lock", "level.dat"):
+            src = export_root / name
+            if not src.is_file():
+                continue
+            # Atomic copy: level.dat existence short-circuits all future
+            # seeding attempts, so a partial copy must never become visible.
+            tmp = final / f".{name}.tmp.{os.getpid()}"
+            try:
+                shutil.copy2(src, tmp)
+                os.replace(tmp, final / name)
+            except OSError as exc:
+                logger.warning("Could not seed %s into world: %s", name, exc)
+                tmp.unlink(missing_ok=True)
+        logger.info("Seeded world metadata (level.dat) from %s", export_root.name)
+
+
 def _merge_and_cleanup(
     config: GeneratorConfig,
     tile: str,
@@ -297,35 +341,48 @@ def _merge_and_cleanup(
     world_file: Path,
     done_marker: Path,
 ) -> None:
-    """Move .mca exports to final world and delete all intermediate files for *tile*.
+    """Merge .mca exports into the final world and delete intermediates for *tile*.
 
-    This is the key space-saving step: instead of keeping per-tile exports on disk
-    until a batch ``post_process_map``, each tile's .mca files are moved into the
-    final ``region/`` directory immediately after WorldPainter finishes.  Then all
-    intermediate artifacts (.world, raw QGIS PNGs) are deleted.
+    Region files are merged at chunk granularity (see ``regionmerge``): tile
+    edges do not align with the 512-block region grid, so adjacent tiles export
+    region files with identical names whose chunk sets must be combined.  A
+    whole-file move here previously destroyed neighbour chunks in every shared
+    boundary region.
+
+    Raises on merge failure so the caller records the tile as failed and the
+    done marker is NOT written — the tile will then be retried on the next run
+    (chunk-level merges are idempotent, a partial merge is safe to repeat).
     """
     final_region = config.world_output_dir / "region"
     final_region.mkdir(parents=True, exist_ok=True)
 
-    # Move .mca region files to final world
     region_dir = exports_folder / "region"
-    moved = 0
+    stats = {"moved": 0, "merged": 0, "rewritten": 0, "skipped": 0}
     if region_dir.is_dir():
-        for mca_file in region_dir.iterdir():
-            if mca_file.is_file():
-                try:
-                    dest = final_region / mca_file.name
-                    shutil.move(str(mca_file), str(dest))
-                    moved += 1
-                except OSError as exc:
-                    logger.warning(
-                        "Failed to move %s → %s: %s", mca_file, dest, exc
-                    )
+        _seed_world_metadata(config, exports_folder)
+        for mca_file in sorted(region_dir.iterdir()):
+            if not mca_file.is_file():
+                continue
+            action = merge_tile_region(
+                mca_file,
+                final_region,
+                tile,
+                config.blocks_per_tile,
+                config.degree_per_tile,
+            )
+            stats[action] += 1
         try:
             shutil.rmtree(str(exports_folder))
         except OSError as exc:
             logger.warning("Failed to remove exports dir %s: %s", exports_folder, exc)
-    logger.info("Tile %s: merged %d .mca files into final world", tile, moved)
+    logger.info(
+        "Tile %s: region merge done (moved=%d merged=%d rewritten=%d skipped=%d)",
+        tile,
+        stats["moved"],
+        stats["merged"],
+        stats["rewritten"],
+        stats["skipped"],
+    )
 
     # Delete .world file after successful export
     try:
@@ -333,14 +390,19 @@ def _merge_and_cleanup(
     except OSError as exc:
         logger.warning("Failed to remove .world file %s: %s", world_file, exc)
 
-    # Delete image_exports for this tile to reclaim disk space
-    tile_img_dir = config.image_exports_dir / tile
-    if tile_img_dir.exists():
-        try:
-            shutil.rmtree(str(tile_img_dir))
-            logger.debug("Cleaned up image_exports for %s", tile)
-        except OSError as exc:
-            logger.warning("Failed to remove image_exports for %s: %s", tile, exc)
+    # Optionally delete image_exports for this tile to reclaim disk space.
+    # Default is to KEEP them: regenerating deleted exports requires re-running
+    # OSM preprocess + QGIS strips, which costs days (learned the hard way).
+    if not config.keep_image_exports:
+        tile_img_dir = config.image_exports_dir / tile
+        if tile_img_dir.exists():
+            try:
+                shutil.rmtree(str(tile_img_dir))
+                logger.debug("Cleaned up image_exports for %s", tile)
+            except OSError as exc:
+                logger.warning(
+                    "Failed to remove image_exports for %s: %s", tile, exc
+                )
 
     # Write sentinel marker so re-runs skip this tile
     try:
@@ -604,6 +666,7 @@ def _wp_generate_daemon(config: GeneratorConfig) -> None:
     """Generate all tiles using the persistent daemon pool."""
     final_region = config.world_output_dir / "region"
     final_region.mkdir(parents=True, exist_ok=True)
+    sweep_tmp_files(final_region)
 
     pool = WPDaemonPool(config)
     pool.start()
@@ -655,6 +718,7 @@ def _wp_generate_legacy(config: GeneratorConfig) -> None:
     )
     final_region = config.world_output_dir / "region"
     final_region.mkdir(parents=True, exist_ok=True)
+    sweep_tmp_files(final_region)
 
     # Build list of pending tiles
     pending_tiles: list[str] = []
@@ -741,6 +805,16 @@ def wp_generate(config: GeneratorConfig) -> None:
 
     When ``config.wp_use_daemon`` is False, the legacy mode is used directly.
     """
+    # The wpscript.js argument in the settingsMapOffset position receives
+    # config.wp_sea_level (historical arg-order quirk).  A nonzero value
+    # shifts every tile by offset*scale*360 blocks, which would break the
+    # geographic chunk-ownership math in regionmerge (every chunk of every
+    # export would be silently classified as unowned and dropped).
+    if config.wp_sea_level != 0:
+        raise ValueError(
+            "wp_sea_level (passed to wpscript.js as settingsMapOffset) must be "
+            "0: the incremental region merge assumes unshifted tile placement"
+        )
     if config.wp_use_daemon:
         try:
             _wp_generate_daemon(config)

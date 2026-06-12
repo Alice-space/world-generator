@@ -12,6 +12,7 @@ from .config import GeneratorConfig
 from .imageexport import image_export
 from .magick import magick_convert, run_magick
 from .preprocess import OGR_LAYER_SPECS
+from .regionmerge import merge_tile_region, sweep_tmp_files
 from .tools import calculateTiles
 from .wpscript import run_world_painter, wp_generate
 
@@ -81,6 +82,7 @@ def post_process_map(config: GeneratorConfig) -> None:
     logger.info("Safety-net merge: checking for leftover exports")
     final_region_path = config.world_output_dir / "region"
     final_region_path.mkdir(parents=True, exist_ok=True)
+    sweep_tmp_files(final_region_path)
 
     wp_export_folder = config.scripts_folder_path / "wpscript" / "exports"
     straggler_count = 0
@@ -89,22 +91,38 @@ def post_process_map(config: GeneratorConfig) -> None:
         region_dir = tile_folder / "region"
         if not region_dir.is_dir():
             continue
-        for mca_file in region_dir.iterdir():
-            if mca_file.is_file():
-                dest = final_region_path / mca_file.name
-                try:
-                    shutil.move(str(mca_file), str(dest))
-                except OSError:
-                    shutil.copy2(mca_file, dest)
-                straggler_count += 1
+        tile = tile_folder.name
+        try:
+            for mca_file in sorted(region_dir.iterdir()):
+                if mca_file.is_file():
+                    # Chunk-level merge with ownership filtering — a plain move
+                    # would overwrite neighbour chunks in shared boundary regions
+                    merge_tile_region(
+                        mca_file,
+                        final_region_path,
+                        tile,
+                        config.blocks_per_tile,
+                        config.degree_per_tile,
+                    )
+                    straggler_count += 1
+        except Exception as exc:
+            # One bad folder (foreign name, corrupt file, IO error) must not
+            # abort the whole safety net — keep it on disk for inspection.
+            logger.warning("Skipping straggler folder %s: %s", tile_folder, exc)
+            continue
         try:
             shutil.rmtree(str(tile_folder))
         except OSError:
             pass
     if straggler_count:
-        logger.info("Safety-net merge: %d straggler .mca files moved", straggler_count)
+        logger.info("Safety-net merge: %d straggler .mca files merged", straggler_count)
     else:
         logger.info("No leftover exports found (all tiles cleaned up incrementally)")
+
+    # Merge side-car locks are only needed while merges can still happen
+    lock_dir = final_region_path / ".merge_locks"
+    if lock_dir.is_dir():
+        shutil.rmtree(str(lock_dir), ignore_errors=True)
 
     logger.info("Running minutor overview")
     final_path = config.world_output_dir
