@@ -124,46 +124,76 @@ def _remember_ocean_tile(config: GeneratorConfig, tile: str) -> None:
             logger.warning("Could not append %s to ocean cache: %s", tile, exc)
 
 
+def _png_colors_and_mean(path: Path) -> tuple[int, float] | None:
+    """Return (unique colours, mean brightness) of an image, or None on error."""
+    try:
+        result = subprocess.run(
+            ["identify", "-format", "%k %[fx:mean]", str(path)],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode != 0:
+            return None
+        colors_s, mean_s = result.stdout.split()
+        return int(colors_s), float(mean_s)
+    except Exception:
+        return None
+
+
 def _is_ocean_tile(config: GeneratorConfig, tile: str) -> bool:
     """Check whether *tile* is a pure-ocean tile.
 
-    Cache hits (``ocean_tiles.txt``) are O(1).  Misses fall back to checking
-    water coverage with ImageMagick (water.png mean >= 0.95) and, when ocean,
-    are appended to the cache so subsequent runs skip the identify call.
+    Cache hits (``ocean_tiles.txt``) are O(1).  Misses are classified from two
+    independent signals and appended to the cache when positive:
 
-    Note: we check water.png mean, not climate.png unique colours.  Uniform
-    land climates (plains, desert) can have 1-colour climate.png and would be
-    incorrectly classified as ocean — water coverage directly measures how much
-    of the tile is water.
+    - ``ecoregions.png`` (WWF terrestrial ecoregions, land-only shapefile)
+      must be a single PURE WHITE colour.  Any land — including the Sahara —
+      carries ecoregion polygons (measured: desert 170 colours, Beijing 357).
+      The Antarctic ice sheet renders as a single GREY ecoregion (mean 0.49),
+      so requiring mean==~1 keeps it on the land path.
+    - ``water.png`` (inland water bodies, black on white) must be a single
+      pure white colour (no water features rendered).
+
+    water.png mean alone is NOT sufficient: waterless land (deserts, steppe)
+    is also pure white there — that latent misclassification was previously
+    masked because a non-empty cache disabled this fallback entirely.
     """
     if tile in _load_ocean_tile_cache(config):
         return True
-    water_png = config.image_exports_dir / tile / f"{tile}_water.png"
-    if not water_png.is_file():
+    tile_dir = config.image_exports_dir / tile
+    eco = _png_colors_and_mean(tile_dir / f"{tile}_ecoregions.png")
+    if eco is None or eco[0] != 1 or eco[1] < 0.999:
         return False
-    try:
-        result = subprocess.run(
-            ["identify", "-format", "%[fx:mean]", str(water_png)],
-            capture_output=True, text=True, timeout=10,
-        )
-        if result.returncode == 0 and float(result.stdout.strip()) >= 0.95:
-            _remember_ocean_tile(config, tile)
-            return True
+    water = _png_colors_and_mean(tile_dir / f"{tile}_water.png")
+    if water is None or water[0] != 1 or water[1] < 0.999:
         return False
-    except (ValueError, Exception):
-        return False
+    _remember_ocean_tile(config, tile)
+    return True
 
 
 def _tile_has_images(config: GeneratorConfig, tile: str) -> bool:
-    """Return True if *tile* has enough QGIS image exports for WorldPainter.
+    """Return True if *tile* has the QGIS+magick outputs WorldPainter needs.
 
-    A complete tile has ~72 files.  Failed QGIS strips produce directories with
-    fewer than 30 files — these tiles cannot be processed and must be skipped.
+    A complete tile has ~72 files; we check the load-bearing subset explicitly
+    instead of a bare file count: wpscript.js hard-fails on a missing climate /
+    bathymetry / processed heightmap, and a missing terrain_reduced_colors
+    means magick has not (re)processed the tile yet — its climate.png may
+    still be raw.  Tiles failing this check are skipped without a done marker,
+    so they are retried on the next run once their images are regenerated.
     """
     tile_dir = config.image_exports_dir / tile
     if not tile_dir.is_dir():
         return False
+    required = (
+        tile_dir / f"{tile}_climate.png",
+        tile_dir / f"{tile}_water.png",
+        tile_dir / f"{tile}_bathymetry.png",
+        tile_dir / f"{tile}_ocean_temp.png",
+        tile_dir / f"{tile}_terrain_reduced_colors.png",
+        tile_dir / "heightmap" / f"{tile}.png",
+    )
     try:
+        if any(not p.is_file() for p in required):
+            return False
         count = sum(1 for _ in tile_dir.iterdir())
         return count >= 30
     except OSError:
