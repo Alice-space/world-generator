@@ -247,7 +247,10 @@ def _schedule_layer_exports(
                 project_path.name, len(pending_indices), attempt, MAX_ATTEMPTS,
             )
         pool = pebble.ProcessPool(
-            max_workers=config.threads,
+            # NOT config.threads: QGIS strip workers reach 12GB+ anon RSS on
+            # data-dense strips; 20 concurrent workers OOM-killed each other
+            # (manifesting as persistent "Abnormal termination" strip failures)
+            max_workers=config.image_export_workers,
             max_tasks=1,
             context=mp.get_context("forkserver"),
             initializer=_init_worker_logging,

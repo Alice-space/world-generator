@@ -147,6 +147,12 @@ class GeneratorConfig:
     # 代价极高（需重跑 preprocess + QGIS 数小时到数天），默认保留。
     keep_image_exports: bool = True
 
+    # QGIS 条带导出专用并发数（默认 5）。QGIS worker 在数据密集条带（东亚、
+    # 美洲）上单进程 anon RSS 可达 12GB+，threads=20 会触发 OOM killer 连环
+    # 杀进程（"Abnormal termination"）。其余阶段（magick/gdal，单进程约
+    # 200MB）继续使用 threads。
+    image_export_workers: int = 5
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -340,6 +346,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
             else None
         ),
         keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
+        image_export_workers=_get_int("image_export_workers"),
     )
 
 
