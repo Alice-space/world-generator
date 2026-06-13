@@ -10,4 +10,6 @@ if [ -x "$SCRIPT_DIR/venv/bin/python3" ]; then
 else
     PYTHON=python3
 fi
-xvfb-run "$PYTHON" -m world_generator "$@"
+# -a: pick a free display automatically — a stale Xvfb (e.g. left over from a
+# killed run) otherwise makes xvfb-run fail with "Xvfb failed to start"
+PYTHONPATH="$SCRIPT_DIR/src${PYTHONPATH:+:$PYTHONPATH}" exec xvfb-run -a "$PYTHON" -m world_generator "$@"
