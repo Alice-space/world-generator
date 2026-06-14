@@ -238,6 +238,15 @@ def _schedule_layer_exports(
     # single worker could push toward OOM.  Segmenting the latitude lets the
     # per-worker footprint drop enough to run several workers in parallel safely.
     lat_seg = max(1, config.image_export_lat_segments)
+    # Bands must tile the 180° column evenly AND align to the tile grid, else
+    # a band edge would split a tile (calculateTiles spans [y, y+degree)) and
+    # silently drop/misplace tiles.
+    if (90 - (-90)) % lat_seg != 0 or ((90 - (-90)) // lat_seg) % degree_per_tile != 0:
+        raise ValueError(
+            f"image_export_lat_segments={lat_seg} must divide 180 and yield bands "
+            f"aligned to degree_per_tile={degree_per_tile} "
+            f"(180/{lat_seg}={180 // lat_seg if lat_seg else 0} must be a multiple of {degree_per_tile})"
+        )
     seg_h = (90 - (-90)) // lat_seg  # degrees of latitude per segment
     work_items: list[tuple[int, int, int, int]] = []
     for i in range(len(x_min_list)):
