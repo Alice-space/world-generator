@@ -147,11 +147,16 @@ class GeneratorConfig:
     # 代价极高（需重跑 preprocess + QGIS 数小时到数天），默认保留。
     keep_image_exports: bool = True
 
-    # QGIS 条带导出专用并发数（默认 5）。QGIS worker 在数据密集条带（东亚、
-    # 美洲）上单进程 anon RSS 可达 12GB+，threads=20 会触发 OOM killer 连环
-    # 杀进程（"Abnormal termination"）。其余阶段（magick/gdal，单进程约
-    # 200MB）继续使用 threads。
+    # QGIS 条带导出专用并发数（默认 5）。QGIS worker 在最密集条带（东亚）上
+    # 单进程 anon RSS 实测可达 38GB（6° 条带），需配合 image_export_strip_width_deg
+    # 一起压低峰值内存：strip_width × workers 的乘积决定并发加载的矢量数据总量。
+    # 其余阶段（magick/gdal，单进程约 200MB）继续使用 threads。
     image_export_workers: int = 5
+
+    # 单条 QGIS 导出条带的经度宽度（度，默认 6，必须整除 360）。密集经度上单
+    # worker 内存大致正比于此宽度；减小它可线性压低 OOM 峰值（代价是更多条带、
+    # 更多 QGIS 项目加载）。1:50 运行设为 2 或 3 以避免东亚条带 OOM。
+    image_export_strip_width_deg: int = 6
 
     # 单条 QGIS 导出条带的超时下限（秒，默认 2400=40min）。实际超时取此值与
     # "条带瓦片数 × 图层数 × image_export_seconds_per_raster" 的较大者——
@@ -362,6 +367,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         ),
         keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
         image_export_workers=_get_int("image_export_workers"),
+        image_export_strip_width_deg=_get_int("image_export_strip_width_deg"),
         image_export_strip_timeout_s=_get_int("image_export_strip_timeout_s"),
         image_export_seconds_per_raster=_get_float("image_export_seconds_per_raster"),
         preprocess_task_timeout_s=_get_int("preprocess_task_timeout_s"),

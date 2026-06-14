@@ -396,10 +396,13 @@ def image_export(config: GeneratorConfig) -> None:
     # rendering those layers entirely.
     _generate_placeholders_for_disabled(config)
 
-    # Use 6-degree strips (60 tasks) instead of 18-degree (20 tasks) for better
-    # load balancing. Workers that finish ocean-heavy strips pick up the next
-    # available strip, reducing the long-tail caused by data-dense regions.
-    strip_width = 6  # degrees per strip
+    # Strip width controls how much vector data a single QGIS worker loads at
+    # once: a 6° strip over the densest longitudes (East Asia: urban+water+
+    # wetland+forest) peaked at ~38 GB anon RSS per worker, so 5 workers OOM-
+    # killed each other.  Narrower strips cut the per-worker footprint roughly
+    # linearly (at the cost of more QGIS project loads).  Configurable so the
+    # 1:50 run can shrink it; must divide 360 evenly.
+    strip_width = config.image_export_strip_width_deg
     num_strips = 360 // strip_width
     x_min_list = [int(-180 + strip_width * i) for i in range(num_strips)]
     x_max_list = [int(-180 + strip_width * (i + 1)) for i in range(num_strips)]
