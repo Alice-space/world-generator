@@ -18,6 +18,15 @@ STAMP=$(date "+%F %T")
 STALL_MIN=20
 RESTART_CAP=10
 
+# Maintenance interlock: while this flag exists, the guard does nothing, so an
+# operator can kill+restart the pipeline by hand without the guard racing to
+# relaunch a second copy (a double instance OOM-killed itself on 2026-06-15).
+[ -f /tmp/pipeline_maintenance ] && exit 0
+# Single-guard lock: never let two guard invocations overlap (a slow restart
+# must not let the next cron tick launch a second pipeline).
+exec 9>/tmp/pipeline_guard.lock
+flock -n 9 || exit 0
+
 free_gb() { df -BG --output=avail "$1" 2>/dev/null | tail -1 | tr -dc 0-9; }
 
 DONE=0
