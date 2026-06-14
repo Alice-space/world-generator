@@ -180,13 +180,15 @@ def export_image(
                     )
                     continue
 
+                # Atomic publish via .part (see export_image_multi for rationale)
+                part_png = png_name.parent / f"{png_name.name}.part"
                 translate = subprocess.run(
                     [
                         "gdal_translate",
                         "-of",
                         "PNG",
                         str(output_tif),
-                        str(png_name),
+                        str(part_png),
                     ],
                     capture_output=True,
                     text=True,
@@ -195,7 +197,13 @@ def export_image(
                     logger.error(
                         "gdal_translate failed for %s: %s", tile, translate.stderr.strip()
                     )
+                    part_png.unlink(missing_ok=True)
+                    Path(f"{part_png}.aux.xml").unlink(missing_ok=True)
                 else:
+                    aux = Path(f"{part_png}.aux.xml")
+                    if aux.exists():
+                        os.replace(str(aux), f"{png_name}.aux.xml")
+                    os.replace(str(part_png), str(png_name))
                     logger.info("Generated %s", png_name.name)
                 try:
                     output_tif.unlink(missing_ok=True)
@@ -307,13 +315,18 @@ def export_image_multi(
                         )
                         continue
 
+                    # Write to a .part path and atomically publish: if the
+                    # worker is SIGKILLed mid-write (OOM on a dense strip), only
+                    # a .part stub is left, never a truncated final png that the
+                    # png_name.exists() skip would honour as complete forever.
+                    part_png = png_name.parent / f"{png_name.name}.part"
                     translate = subprocess.run(
                         [
                             "gdal_translate",
                             "-of",
                             "PNG",
                             str(output_tif),
-                            str(png_name),
+                            str(part_png),
                         ],
                         capture_output=True,
                         text=True,
@@ -325,8 +338,20 @@ def export_image_multi(
                             layer_output_name,
                             translate.stderr.strip(),
                         )
+                        part_png.unlink(missing_ok=True)
+                        Path(f"{part_png}.aux.xml").unlink(missing_ok=True)
                     else:
+                        aux = Path(f"{part_png}.aux.xml")
+                        if aux.exists():
+                            os.replace(str(aux), f"{png_name}.aux.xml")
+                        os.replace(str(part_png), str(png_name))
                         logger.info("Generated %s", png_name.name)
+                    # multi-layer export never deleted its intermediate tif —
+                    # reclaim it (these accumulated across the whole run).
+                    try:
+                        output_tif.unlink(missing_ok=True)
+                    except Exception:
+                        logger.debug("Could not delete temp tif %s", output_tif)
                     try:
                         output_tif.unlink(missing_ok=True)
                     except Exception:
