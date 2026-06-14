@@ -252,7 +252,13 @@ def _schedule_layer_exports(
             # (manifesting as persistent "Abnormal termination" strip failures)
             max_workers=config.image_export_workers,
             max_tasks=1,
-            context=mp.get_context("forkserver"),
+            # spawn (not forkserver): a long-lived forkserver daemon is shared
+            # across the 5 sequential export pools in image_export(); when an
+            # earlier pool's semaphores are reaped (or after a kill -9 leaves
+            # stale state) the daemon hands out workers whose SemLock._rebuild
+            # raises FileNotFoundError, and the fork-crash loop hangs the whole
+            # stage forever.  spawn gives every worker a clean interpreter.
+            context=mp.get_context("spawn"),
             initializer=_init_worker_logging,
             initargs=[log_files, mirror_console, log_level],
         )
@@ -271,6 +277,9 @@ def _schedule_layer_exports(
                     90,
                     layer_map,
                 ],
+                # Bound each strip so one wedged QGIS worker cannot stall the
+                # pool indefinitely; pebble kills it and the strip is retried.
+                timeout=config.image_export_strip_timeout_s,
             )
             futures.append((idx, f))
         pool.close()
@@ -429,7 +438,9 @@ def image_export(config: GeneratorConfig) -> None:
     pool = pebble.ProcessPool(
         max_workers=config.threads,
         max_tasks=1,
-        context=mp.get_context("forkserver"),
+        # spawn: this gdal pool follows the QGIS export pools above; sharing a
+        # forkserver daemon across them risks the SemLock fork-crash hang.
+        context=mp.get_context("spawn"),
         initializer=_init_worker_logging,
         initargs=[log_files, mirror_console, log_level],
     )

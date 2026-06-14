@@ -281,7 +281,10 @@ def magick_convert(config: GeneratorConfig) -> None:
     pool = pebble.ProcessPool(
         max_workers=config.threads,
         max_tasks=1,
-        context=mp.get_context("forkserver"),
+        # spawn (not forkserver): magick runs after image_export's spawn pools
+        # in the same process; reusing a forkserver daemon across stages risks
+        # the SemLock._rebuild fork-crash that previously hung the pipeline.
+        context=mp.get_context("spawn"),
     )
     futures = []
     tile_for_future = {}

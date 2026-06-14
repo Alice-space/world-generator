@@ -153,6 +153,11 @@ class GeneratorConfig:
     # 200MB）继续使用 threads。
     image_export_workers: int = 5
 
+    # 单条 QGIS 导出条带的超时秒数（默认 2400=40min）。正常一条 6° 条带
+    # 5-15min；卡死的 worker（QGIS 内部死锁等）超时后被 pebble 终止并重试，
+    # 避免单 worker 永久挂起拖垮整个进程池。
+    image_export_strip_timeout_s: int = 2400
+
     @property
     def osm_data_dir(self) -> Path:
         return self.osm_folder_path / "all"
@@ -347,6 +352,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         ),
         keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
         image_export_workers=_get_int("image_export_workers"),
+        image_export_strip_timeout_s=_get_int("image_export_strip_timeout_s"),
     )
 
 
