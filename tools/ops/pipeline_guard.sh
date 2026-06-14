@@ -62,9 +62,10 @@ if [ -n "$PYPID" ]; then
   if [ "$STALLED" = "1" ]; then
     PGID=$(ps -o pgid= -p "$PYPID" | tr -d ' ')
     echo "$STAMP STALLED (no progress for ~$((AGE/60))min) — killing PGID $PGID and restarting" >> "$LOG"
+    # Kill the whole process group (one shared PGID reaps the xvfb-run wrapper,
+    # python, and all spawn workers).  Do NOT pkill by cmdline: that would also
+    # kill a concurrent operator diagnostic run of the same module.
     [ -n "$PGID" ] && kill -9 -"$PGID" 2>/dev/null
-    # also reap any xvfb-run wrapper / leftover workers, then stale IPC/tmp
-    pkill -9 -f "[-]m world_generator tiles" 2>/dev/null
     rm -rf /tmp/pymp-* /tmp/xvfb-run.* /tmp/.X*-lock /tmp/qt_temp-* 2>/dev/null
     sleep 5
     REASON=STALL

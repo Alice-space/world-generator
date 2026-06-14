@@ -128,14 +128,20 @@ def post_process_map(config: GeneratorConfig) -> None:
     final_path = config.world_output_dir
     output_png = config.scripts_folder_path / f"{config.world_name}.png"
     # Idempotent: a restart after the overview is rendered must not redo it
-    # (a depth-319 whole-world render takes hours).
-    if output_png.exists():
+    # (a depth-319 whole-world render takes hours).  Honour the skip ONLY for a
+    # fully-written (non-empty) PNG — a partial file left by a SIGKILL/OOM/power
+    # loss mid-render must be re-done, not cached forever as "already rendered".
+    if output_png.exists() and output_png.stat().st_size > 0:
         logger.info("Minutor overview already rendered at %s, skipping", output_png)
         return
     logger.info("Running minutor overview (depth %d) -> %s", config.minutor_depth, output_png)
-    # Stream output AND emit a periodic heartbeat: the render is silent for hours,
-    # which would otherwise freeze the log file mtime and trip the guard's stall
-    # detector into a kill -9 loop that can never let the render finish.
+    # Render to a temp path and atomically publish on success, so the final path
+    # is only ever a complete image (the .exists() skip above can then never honour
+    # a truncated file).  Stream output AND emit a periodic heartbeat: the render
+    # is silent for hours, which would otherwise freeze the log file mtime and trip
+    # the guard's stall detector into a kill -9 loop that can never let it finish.
+    tmp_png = output_png.with_suffix(".png.tmp")
+    tmp_png.unlink(missing_ok=True)  # discard any prior interrupted attempt
     proc = subprocess.Popen(
         [
             "minutor",
@@ -144,7 +150,7 @@ def post_process_map(config: GeneratorConfig) -> None:
             "--depth",
             str(config.minutor_depth),
             "--savepng",
-            str(output_png),
+            str(tmp_png),
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -161,15 +167,24 @@ def post_process_map(config: GeneratorConfig) -> None:
     hb = threading.Thread(target=_heartbeat, daemon=True)
     hb.start()
     try:
-        for line in proc.stdout:
-            if line.strip():
-                logger.info("minutor: %s", line.rstrip())
+        if proc.stdout is not None:
+            for line in proc.stdout:
+                if line.strip():
+                    logger.info("minutor: %s", line.rstrip())
         proc.wait()
+    except BaseException:
+        # Read error / interrupt — reap the child so a multi-hour render does not
+        # keep burning CPU orphaned after the pipeline aborts.
+        proc.kill()
+        proc.wait()
+        raise
     finally:
         stop.set()
     if proc.returncode != 0:
         logger.error("minutor overview failed (exit %d)", proc.returncode)
+        tmp_png.unlink(missing_ok=True)  # do not let a partial render be cached
     else:
+        os.replace(tmp_png, output_png)  # atomic publish; partials never reach final
         logger.info("Minutor overview complete: %s", output_png)
 
 
