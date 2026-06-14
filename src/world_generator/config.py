@@ -155,8 +155,14 @@ class GeneratorConfig:
 
     # 单条 QGIS 导出条带的经度宽度（度，默认 6，必须整除 360）。密集经度上单
     # worker 内存大致正比于此宽度；减小它可线性压低 OOM 峰值（代价是更多条带、
-    # 更多 QGIS 项目加载）。1:50 运行设为 2 或 3 以避免东亚条带 OOM。
+    # 更多 QGIS 项目加载）。1:50 运行设为 1 以避免东亚条带 OOM。
     image_export_strip_width_deg: int = 6
+
+    # 纬度分段数（默认 1=整列）。每个 worker 只渲染其纬度段内的要素，故单 worker
+    # 内存大致正比于 1/lat_segments。即使 strip_width=1，密集经度的整列（全纬度
+    # × 30+ 图层）单 worker 实测峰值达 59GB，逼近 OOM；纬度分段把单 worker 足迹
+    # 降到可并行多 worker 的水平。必须整除 180/degree_per_tile。1:50 设 4。
+    image_export_lat_segments: int = 1
 
     # 单条 QGIS 导出条带的超时下限（秒，默认 2400=40min）。实际超时取此值与
     # "条带瓦片数 × 图层数 × image_export_seconds_per_raster" 的较大者——
@@ -368,6 +374,7 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
         image_export_workers=_get_int("image_export_workers"),
         image_export_strip_width_deg=_get_int("image_export_strip_width_deg"),
+        image_export_lat_segments=_get_int("image_export_lat_segments"),
         image_export_strip_timeout_s=_get_int("image_export_strip_timeout_s"),
         image_export_seconds_per_raster=_get_float("image_export_seconds_per_raster"),
         preprocess_task_timeout_s=_get_int("preprocess_task_timeout_s"),

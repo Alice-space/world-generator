@@ -230,12 +230,28 @@ def _schedule_layer_exports(
         return
     log_files, mirror_console, log_level = _gather_logging_targets()
 
-    # Some strips occasionally fail with pebble "Abnormal termination" (worker
-    # crash, segfault, or transient resource issue). Retry failed strips up to
+    # Build work items = (longitude strip) × (latitude segment).  A single
+    # worker loads only the vector features inside its render extent, so
+    # splitting the full -90..90 column into latitude bands cuts per-worker
+    # memory ~linearly: a 1° strip over the densest longitudes (Sumatra,
+    # East-China) peaked at ~59 GB anon RSS over the FULL column, which even a
+    # single worker could push toward OOM.  Segmenting the latitude lets the
+    # per-worker footprint drop enough to run several workers in parallel safely.
+    lat_seg = max(1, config.image_export_lat_segments)
+    seg_h = (90 - (-90)) // lat_seg  # degrees of latitude per segment
+    work_items: list[tuple[int, int, int, int]] = []
+    for i in range(len(x_min_list)):
+        for s in range(lat_seg):
+            y_lo = -90 + s * seg_h
+            y_hi = 90 if s == lat_seg - 1 else -90 + (s + 1) * seg_h
+            work_items.append((x_min_list[i], x_max_list[i], y_lo, y_hi))
+
+    # Some items occasionally fail with pebble "Abnormal termination" (worker
+    # crash, segfault, or transient resource issue). Retry failed items up to
     # MAX_ATTEMPTS times before aborting — already-rendered tiles are skipped
     # by per-tile png_name.exists() checks, so retries are cheap.
     MAX_ATTEMPTS = 3
-    pending_indices = list(range(len(x_min_list)))
+    pending_indices = list(range(len(work_items)))
     last_failures: list[tuple[int, BaseException]] = []
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -243,13 +259,13 @@ def _schedule_layer_exports(
             break
         if attempt > 1:
             logger.warning(
-                "%s: retrying %d failed strips (attempt %d/%d)",
+                "%s: retrying %d failed items (attempt %d/%d)",
                 project_path.name, len(pending_indices), attempt, MAX_ATTEMPTS,
             )
         pool = pebble.ProcessPool(
-            # NOT config.threads: QGIS strip workers reach 12GB+ anon RSS on
-            # data-dense strips; 20 concurrent workers OOM-killed each other
-            # (manifesting as persistent "Abnormal termination" strip failures)
+            # NOT config.threads: even one QGIS worker over a dense full column
+            # reached ~59 GB; concurrency is bounded by image_export_workers and
+            # the per-worker footprint is bounded by image_export_lat_segments.
             max_workers=config.image_export_workers,
             max_tasks=1,
             # spawn (not forkserver): a long-lived forkserver daemon is shared
@@ -262,21 +278,21 @@ def _schedule_layer_exports(
             initializer=_init_worker_logging,
             initargs=[log_files, mirror_console, log_level],
         )
-        # Per-strip timeout scaled to the strip's actual workload: a dense
-        # degree_per_tile=1 strip renders (cols x rows x layers) full rasters and
-        # legitimately runs hours, so a flat 40min cap would false-kill it every
-        # attempt and soft-fail after 3 retries (silently dropping tiles).  The
-        # configured value is only a floor for cheap small-config strips.
-        lat_rows = (90 - (-90)) // degree_per_tile
+        # Per-item timeout scaled to the item's actual workload (tiles × layers):
+        # a dense degree_per_tile=1 item renders many full rasters and legitimately
+        # runs a long time, so a flat 40min cap would false-kill it every attempt
+        # and soft-fail after 3 retries (silently dropping tiles).  The configured
+        # value is only a floor for cheap small-config items.
         futures: list[tuple[int, object]] = []
         for idx in pending_indices:
-            tiles_in_strip = (
-                (x_max_list[idx] - x_min_list[idx]) // degree_per_tile
-            ) * lat_rows
-            strip_timeout = max(
+            x_min, x_max, y_lo, y_hi = work_items[idx]
+            tiles_in_item = (
+                (x_max - x_min) // degree_per_tile
+            ) * ((y_hi - y_lo) // degree_per_tile)
+            item_timeout = max(
                 config.image_export_strip_timeout_s,
                 int(
-                    tiles_in_strip
+                    tiles_in_item
                     * len(layer_map)
                     * config.image_export_seconds_per_raster
                 ),
@@ -288,15 +304,15 @@ def _schedule_layer_exports(
                     str(project_path),
                     blocks_per_tile,
                     degree_per_tile,
-                    x_min_list[idx],
-                    x_max_list[idx],
-                    -90,
-                    90,
+                    x_min,
+                    x_max,
+                    y_lo,
+                    y_hi,
                     layer_map,
                 ],
-                # Bound each strip so one wedged QGIS worker cannot stall the
-                # pool indefinitely; pebble kills it and the strip is retried.
-                timeout=strip_timeout,
+                # Bound each item so one wedged QGIS worker cannot stall the
+                # pool indefinitely; pebble kills it and the item is retried.
+                timeout=item_timeout,
             )
             futures.append((idx, f))
         pool.close()
@@ -313,23 +329,27 @@ def _schedule_layer_exports(
 
     if last_failures:
         logger.error(
-            "%s: %d strips still failed after %d attempts; continuing pipeline",
+            "%s: %d items still failed after %d attempts; continuing pipeline",
             project_path.name, len(last_failures), MAX_ATTEMPTS,
         )
         for idx, exc in last_failures[:10]:
-            logger.error("  strip idx=%d (x_min=%d): %s",
-                         idx, x_min_list[idx], exc)
+            xm, xx, yl, yh = work_items[idx]
+            logger.error("  item idx=%d (x=%d..%d y=%d..%d): %s",
+                         idx, xm, xx, yl, yh, exc)
         # Do NOT raise — abnormal-termination crashes are persistent for some
-        # strips (likely a QGIS internal bug on specific input data). Aborting
+        # items (likely a QGIS internal bug on specific input data). Aborting
         # the entire run loses all progress; let downstream stages run on
-        # what we have, and re-run this stage later for the remaining strips.
+        # what we have, and re-run this stage later for the remaining items.
         # Persist the failure list so users can audit.
         try:
             failure_log = config.scripts_folder_path / "image_export_failures.txt"
             with failure_log.open("a") as fh:
                 fh.write("# " + project_path.name + "\n")
                 for idx, exc in last_failures:
-                    fh.write(f"strip_idx={idx} x_min={x_min_list[idx]} err={exc}\n")
+                    xm, xx, yl, yh = work_items[idx]
+                    fh.write(
+                        f"item_idx={idx} x={xm}..{xx} y={yl}..{yh} err={exc}\n"
+                    )
         except Exception as exc:  # noqa: BLE001
             logger.warning("Could not write failure log: %s", exc)
 
