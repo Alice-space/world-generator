@@ -250,7 +250,13 @@ def _run_parallel_osmium(config: GeneratorConfig, layers: Sequence[str]) -> None
         max_workers=max_workers, context=context, max_tasks=1
     ) as pool:
         futures = [
-            pool.schedule(_run_osmium_for_layer, args=[config, layer])
+            pool.schedule(
+                _run_osmium_for_layer,
+                args=[config, layer],
+                # Bound each layer so a wedged osmium worker raises TimeoutError
+                # instead of blocking future.result() (and the run) forever.
+                timeout=config.preprocess_task_timeout_s,
+            )
             for layer in layers
         ]
         for future in futures:
@@ -333,7 +339,12 @@ def _run_parallel_shapefile_fix(config: GeneratorConfig, layers: Sequence[str]) 
         max_workers=max_workers, context=context, max_tasks=1
     ) as pool:
         futures = [
-            pool.schedule(_ogr2ogr_fix_layer, args=[config, layer]) for layer in layers
+            pool.schedule(
+                _ogr2ogr_fix_layer,
+                args=[config, layer],
+                timeout=config.preprocess_task_timeout_s,
+            )
+            for layer in layers
         ]
         for future in futures:
             future.result()

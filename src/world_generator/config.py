@@ -153,10 +153,20 @@ class GeneratorConfig:
     # 200MB）继续使用 threads。
     image_export_workers: int = 5
 
-    # 单条 QGIS 导出条带的超时秒数（默认 2400=40min）。正常一条 6° 条带
-    # 5-15min；卡死的 worker（QGIS 内部死锁等）超时后被 pebble 终止并重试，
-    # 避免单 worker 永久挂起拖垮整个进程池。
+    # 单条 QGIS 导出条带的超时下限（秒，默认 2400=40min）。实际超时取此值与
+    # "条带瓦片数 × 图层数 × image_export_seconds_per_raster" 的较大者——
+    # degree_per_tile=1 时一条 6° 条带是 6×180=1080 瓦片，主工程约 60 层，
+    # 密集陆地条带要 2-4 小时，固定 40min 会误杀并在 3 次重试后软失败丢瓦片。
+    # 此下限只对小配置（example/docker，条带很便宜）生效。
     image_export_strip_timeout_s: int = 2400
+    # 每张栅格（rasterize+gdal_translate 一层一瓦片）的预估耗时秒数，用于按
+    # 工作量推导单条带超时。0.5 给密集条带留足余量，空条带远不触及上限。
+    image_export_seconds_per_raster: float = 0.5
+
+    # 单个 preprocess 任务（osmium tags-filter / ogr2ogr 一个图层）的超时秒数
+    # （默认 21600=6h）。全 planet 提取的大图层（water.osm 约 146G）耗时长；
+    # 超时让卡死的 worker 被 pebble 终止并抛错，而非永久阻塞 future.result()。
+    preprocess_task_timeout_s: int = 21600
 
     @property
     def osm_data_dir(self) -> Path:
@@ -353,6 +363,8 @@ def load_config(config_path: str | Path | None = None) -> GeneratorConfig:
         keep_image_exports=_coerce_bool(raw.get("keep_image_exports", True)),
         image_export_workers=_get_int("image_export_workers"),
         image_export_strip_timeout_s=_get_int("image_export_strip_timeout_s"),
+        image_export_seconds_per_raster=_get_float("image_export_seconds_per_raster"),
+        preprocess_task_timeout_s=_get_int("preprocess_task_timeout_s"),
     )
 
 

@@ -5,6 +5,7 @@ import multiprocessing as mp
 import os
 import shutil
 import subprocess
+import threading
 
 import pebble
 
@@ -124,10 +125,18 @@ def post_process_map(config: GeneratorConfig) -> None:
     if lock_dir.is_dir():
         shutil.rmtree(str(lock_dir), ignore_errors=True)
 
-    logger.info("Running minutor overview")
     final_path = config.world_output_dir
     output_png = config.scripts_folder_path / f"{config.world_name}.png"
-    result = subprocess.run(
+    # Idempotent: a restart after the overview is rendered must not redo it
+    # (a depth-319 whole-world render takes hours).
+    if output_png.exists():
+        logger.info("Minutor overview already rendered at %s, skipping", output_png)
+        return
+    logger.info("Running minutor overview (depth %d) -> %s", config.minutor_depth, output_png)
+    # Stream output AND emit a periodic heartbeat: the render is silent for hours,
+    # which would otherwise freeze the log file mtime and trip the guard's stall
+    # detector into a kill -9 loop that can never let the render finish.
+    proc = subprocess.Popen(
         [
             "minutor",
             "--world",
@@ -137,13 +146,31 @@ def post_process_map(config: GeneratorConfig) -> None:
             "--savepng",
             str(output_png),
         ],
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
     )
-    if result.stdout.strip():
-        logger.info("minutor output: %s", result.stdout.strip())
-    if result.stderr.strip():
-        logger.error("minutor error: %s", result.stderr.strip())
+    stop = threading.Event()
+
+    def _heartbeat() -> None:
+        elapsed = 0
+        while not stop.wait(300):  # 5 min < guard STALL_MIN (20 min)
+            elapsed += 5
+            logger.info("minutor overview still rendering (%d min elapsed)", elapsed)
+
+    hb = threading.Thread(target=_heartbeat, daemon=True)
+    hb.start()
+    try:
+        for line in proc.stdout:
+            if line.strip():
+                logger.info("minutor: %s", line.rstrip())
+        proc.wait()
+    finally:
+        stop.set()
+    if proc.returncode != 0:
+        logger.error("minutor overview failed (exit %d)", proc.returncode)
+    else:
+        logger.info("Minutor overview complete: %s", output_png)
 
 
 def _process_single_tile(args: tuple) -> None:

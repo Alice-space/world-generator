@@ -262,8 +262,25 @@ def _schedule_layer_exports(
             initializer=_init_worker_logging,
             initargs=[log_files, mirror_console, log_level],
         )
+        # Per-strip timeout scaled to the strip's actual workload: a dense
+        # degree_per_tile=1 strip renders (cols x rows x layers) full rasters and
+        # legitimately runs hours, so a flat 40min cap would false-kill it every
+        # attempt and soft-fail after 3 retries (silently dropping tiles).  The
+        # configured value is only a floor for cheap small-config strips.
+        lat_rows = (90 - (-90)) // degree_per_tile
         futures: list[tuple[int, object]] = []
         for idx in pending_indices:
+            tiles_in_strip = (
+                (x_max_list[idx] - x_min_list[idx]) // degree_per_tile
+            ) * lat_rows
+            strip_timeout = max(
+                config.image_export_strip_timeout_s,
+                int(
+                    tiles_in_strip
+                    * len(layer_map)
+                    * config.image_export_seconds_per_raster
+                ),
+            )
             f = pool.schedule(
                 export_image_multi,
                 [
@@ -279,7 +296,7 @@ def _schedule_layer_exports(
                 ],
                 # Bound each strip so one wedged QGIS worker cannot stall the
                 # pool indefinitely; pebble kills it and the strip is retried.
-                timeout=config.image_export_strip_timeout_s,
+                timeout=strip_timeout,
             )
             futures.append((idx, f))
         pool.close()

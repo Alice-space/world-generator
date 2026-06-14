@@ -13,6 +13,7 @@ from pathlib import Path
 import pebble
 
 from .config import GeneratorConfig
+from .imageexport import _gather_logging_targets, _init_worker_logging
 from .tools import calculateTiles
 
 logger = logging.getLogger(__name__)
@@ -278,6 +279,13 @@ def run_magick(config: GeneratorConfig, tile: str) -> None:
 
 def magick_convert(config: GeneratorConfig) -> None:
     degree_per_tile = config.degree_per_tile
+    # Under spawn, each worker is a fresh interpreter with no inherited log
+    # handlers (root defaults to WARNING/stderr). Without an initializer, every
+    # run_magick logger.info/.error would be dropped and the monitored log file
+    # mtime would freeze for the whole magick stage — tripping the guard's
+    # 20-min stall detector into a false-positive kill -9. Reconfigure logging
+    # in each worker, matching the two imageexport spawn pools.
+    log_files, mirror_console, log_level = _gather_logging_targets()
     pool = pebble.ProcessPool(
         max_workers=config.threads,
         max_tasks=1,
@@ -285,6 +293,8 @@ def magick_convert(config: GeneratorConfig) -> None:
         # in the same process; reusing a forkserver daemon across stages risks
         # the SemLock._rebuild fork-crash that previously hung the pipeline.
         context=mp.get_context("spawn"),
+        initializer=_init_worker_logging,
+        initargs=[log_files, mirror_console, log_level],
     )
     futures = []
     tile_for_future = {}
