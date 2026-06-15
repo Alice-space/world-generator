@@ -3,6 +3,7 @@
 This module keeps the heavy imports isolated so the rest of the codebase remains
 importable even on machines without QGIS installed."""
 
+import gc
 import logging
 import os
 import subprocess
@@ -352,10 +353,17 @@ def export_image_multi(
                         output_tif.unlink(missing_ok=True)
                     except Exception:
                         logger.debug("Could not delete temp tif %s", output_tif)
-                    try:
-                        output_tif.unlink(missing_ok=True)
-                    except Exception:
-                        logger.debug("Could not delete temp file %s", output_tif)
+            # Release this layer group's feature cache before rendering the next
+            # group, so the worker's RSS stays near a single group's peak instead
+            # of accumulating every group's features.  Dense forest/water layers
+            # otherwise accumulate past 78GB and OOM the worker (the structural
+            # cause of the East-Asia image-export OOMs).
+            for _layer in requested_layers:
+                try:
+                    _layer.dataProvider().reloadData()
+                except Exception:
+                    pass
+            gc.collect()
     except Exception as exc:
         logger.error("QGIS multi-layer export failed for %s: %s", project_path, exc)
     finally:
